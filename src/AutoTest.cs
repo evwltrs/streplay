@@ -156,6 +156,18 @@ namespace Streplay
                     return null;
                 }
                 case "seekview": Log(rp.TestSeekView(a.Length > 1 ? F(a[1]) : 0.05f)); return null;
+                case "weaponkill":
+                {
+                    // a non-Gun weapon's own kill path (Weapon.KillShockWave -> the game's kill counter), as a rifle kill runs it
+                    var fpc = Settings.Instance != null ? Settings.Instance.localPlayer : null;
+                    var wpn = Resources.FindObjectsOfTypeAll<LargeRaycastGun>().FirstOrDefault();
+                    if (fpc == null || wpn == null) { Log("no local player or weapon"); return null; }
+                    var keep = wpn.playerController;
+                    wpn.playerController = fpc;
+                    wpn.KillShockWave();
+                    wpn.playerController = keep;
+                    return null;
+                }
                 case "shockwave":
                 {
                     var fpc = Settings.Instance != null ? Settings.Instance.localPlayer : null;

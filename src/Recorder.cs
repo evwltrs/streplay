@@ -129,7 +129,12 @@ namespace Streplay
 
         static int CurrentTake => ScoreManager.Instance != null ? ScoreManager.Instance.TakeIndex : -1;
 
-        // Called (observe-only) when the game plays the local player's kill shockwave, which every weapon does on a kill.
+        internal void OnLocalDeath()
+        {
+            if (IsRecording && Plugin.AutoMarkDeaths.Value) AddMarker("Died", auto: true);
+        }
+
+        // Called (observe-only) when the game counts a kill for the local player, which every weapon does.
         internal void OnLocalKill()
         {
             if (!IsRecording) return;
@@ -800,10 +805,6 @@ namespace Streplay
                     _lastKill.Marker.Label = $"Kill: {victim}";
                     try { _meta.Save(); } catch (Exception e) { Plugin.Log.LogWarning($"Marker metadata save failed: {e.Message}"); }
                 }
-            }
-            else if (Plugin.AutoMarkDeaths.Value && method == "ExplodeForAll" && inst is PlayerHealth && nob.IsOwner)
-            {
-                AddMarker("Died", auto: true);
             }
         }
 

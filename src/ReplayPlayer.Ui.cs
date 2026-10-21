@@ -504,6 +504,7 @@ namespace Streplay
                 if (!_uiVisible) return;
 
                 DrawTimeline();
+                if (!Active || _data == null) return; // Exit on the timeline closes the replay mid-frame
                 DrawSidePanel();
                 if (_renderPanel) DrawRenderPanel();
                 if (_help) DrawHelp();
