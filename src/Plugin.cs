@@ -25,6 +25,7 @@ namespace Streplay
 
         // General
         internal static ConfigEntry<string> ReplayFolder;
+        internal static ConfigEntry<float> MaxFolderSizeGB;
         // Recording
         internal static ConfigEntry<bool> RecordEnabled;
         internal static ConfigEntry<float> SampleRate;
@@ -86,6 +87,10 @@ namespace Streplay
 
             string defaultFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Streplay");
             ReplayFolder = Config.Bind("General", "ReplayFolder", defaultFolder, "Where replays (.strp + .strp.json) are saved.");
+            MaxFolderSizeGB = Config.Bind("General", "MaxFolderSizeGB", 20f,
+                new ConfigDescription("When the replays in ReplayFolder take more than this, the oldest rounds without any of your markers are deleted " +
+                    "after each round (rounds with markers you placed are always kept; renders are never touched). 0 = never delete.",
+                    new AcceptableValueRange<float>(0f, 10000f)));
 
             RecordEnabled = Config.Bind("Recording", "Enabled", true, "Automatically record every round you play or spectate.");
             SampleRate = Config.Bind("Recording", "SampleRate", 60f,
@@ -131,9 +136,9 @@ namespace Streplay
             FreeCamSpeed = Config.Bind("Playback", "FreeCamSpeed", 8f, "Free camera base speed (units/second).");
             MouseSensitivity = Config.Bind("Playback", "MouseSensitivity", 2f, "Free camera mouse sensitivity.");
             DefaultFov = Config.Bind("Playback", "DefaultFov", 90f, "Free camera starting field of view.");
-            RenderWidth = Config.Bind("Render", "Width", 3840,
+            RenderWidth = Config.Bind("Render", "Width", 1920,
                 new ConfigDescription("Output width in pixels (independent of the game window).", new AcceptableValueRange<int>(16, 8192)));
-            RenderHeight = Config.Bind("Render", "Height", 2160,
+            RenderHeight = Config.Bind("Render", "Height", 1080,
                 new ConfigDescription("Output height in pixels.", new AcceptableValueRange<int>(16, 8192)));
             RenderFps = Config.Bind("Render", "Fps", 60,
                 new ConfigDescription("Output frames per second of video.", new AcceptableValueRange<int>(1, 1000)));
@@ -153,7 +158,7 @@ namespace Streplay
                 new ConfigDescription("Motion blur sub-frames drawn per game frame. Above 1, the extra ones re-pose the replay and redraw the cameras " +
                     "without a whole engine frame (much faster); particles and physics then step once per game frame instead of every sub-frame. 1 = the old way.",
                     new AcceptableValueRange<int>(1, 32)));
-            RenderMaxSubFrames = Config.Bind("Render", "MaxSubFrames", 256,
+            RenderMaxSubFrames = Config.Bind("Render", "MaxSubFrames", 128,
                 new ConfigDescription("Most sub-frames a single frame can get with AdaptiveSubFrames.", new AcceptableValueRange<int>(2, 512)));
             RenderFormatSetting = Config.Bind("Render", "Format", RenderFormat.H264,
                 "H264 / H265 (.mp4, high bitrate), ProRes4444 (.mov) or PngSequence. Video formats need ffmpeg; without it PNG frames are written.");
@@ -178,10 +183,10 @@ namespace Streplay
                 HudShow[i] = Config.Bind("HUD", "Show" + HudReplay.Parts[i].key, HudReplay.PartDefault(HudReplay.Parts[i].key),
                     $"Show the game's {HudReplay.Parts[i].label.ToLowerInvariant()} in My view and in renders.");
             FfmpegPath = Config.Bind("Render", "FfmpegPath", "",
-                "ffmpeg.exe (or the folder containing it). Empty = look in <ReplayFolder>\\ffmpeg, the plugin folder, then PATH.");
+                "ffmpeg.exe (or the folder containing it). Empty = look in <ReplayFolder>\\ffmpeg, the BepInEx plugin folders (an ffmpeg package), then PATH.");
 
             DumpKey = Config.Bind("Debug", "DumpKey", new KeyboardShortcut(KeyCode.F11),
-                "Write the hierarchy of every networked object to the replay folder (for debugging).");
+                "Write a diagnostic dump (the scene and every networked object) to the replay folder, to attach to bug reports.");
 
             Directory.CreateDirectory(ReplayFolder.Value);
 

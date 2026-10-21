@@ -268,6 +268,7 @@ namespace Streplay
             }
             Plugin.Log.LogInfo($"Saved replay {_meta.ReplayFile} ({duration:0.0}s, {_meta.Markers.Count} markers)");
             _tracked.Clear();
+            Retention.EnforceAsync(_meta.MetaPath);
         }
 
         public ReplayMeta.MetaMarker AddMarker(string label, bool auto)
