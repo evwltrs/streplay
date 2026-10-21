@@ -62,6 +62,7 @@ namespace Streplay
 
         internal static ReplayBrowser Instance;
         void Awake() => Instance = this;
+        internal static bool TestHideButton, TestHover; // AutoTest: clean screenshots of the menu / the lit button
 
 #if STREPLAY_AUTOTEST
         internal void TestSetOpen(bool on) { if (_open != on) Toggle(); }
@@ -109,8 +110,7 @@ namespace Streplay
             {
                 if (!_open)
                 {
-                    string label = $"Replays  {Plugin.BrowserKey.Value}";
-                    if (Ui.Button(new Rect(16f, 16f, Ui.AutoW(label, Ui.IconFilm, 38f), 38f), label, false, Ui.Kind.Primary, Ui.IconFilm, 13)) Toggle();
+                    DrawMenuButton();
                     return;
                 }
                 // dim the menu behind; the window is the only thing that takes clicks
@@ -121,6 +121,84 @@ namespace Streplay
                 DrawContents(win);
             }
             finally { Ui.End(); }
+        }
+
+        // ---------------------------------------------------------------- the menu's Replays button
+
+        // STRAFTAT's menu palette (sampled from the game): lime-yellow headline text, mint labels, warm white when lit
+        static readonly Color MenuLime = new Color(233f / 255f, 1f, 145f / 255f);
+        static readonly Color MenuLit = new Color(254f / 255f, 1f, 222f / 255f);
+        static readonly Color MenuMint = new Color(187f / 255f, 243f / 255f, 192f / 255f, 0.6f);
+        static readonly Color MenuInk = new Color(0.04f, 0.07f, 0.05f, 0.92f);
+        static readonly Color MenuRec = new Color(0.86f, 0.28f, 0.22f);
+
+        static bool OnTitleScreen
+        {
+            get
+            {
+                var mc = MenuController.Instance;
+                return mc != null && mc.startMenu != null && mc.startMenu.activeInHierarchy;
+            }
+        }
+
+        static bool InLobby => SteamLobby.Instance != null && SteamLobby.Instance.inSteamLobby;
+
+        // In the frame's empty name slot when it's free, like a part of the menu; a small plate in the same style otherwise.
+        // Not on the title screen, and not in a lobby: the slot shows the lobby's name then, and replays can't open anyway.
+        void DrawMenuButton()
+        {
+            if (TestHideButton || OnTitleScreen || InLobby) return;
+            var slot = MenuSlot.ScreenRect();
+            if (slot.HasValue)
+            {
+                var s = slot.Value;
+                var r = new Rect(s.x / Ui.Scale, s.y / Ui.Scale, s.width / Ui.Scale, s.height / Ui.Scale);
+                if (DrawSlotButton(r)) Toggle();
+                return;
+            }
+            var p = new Rect(18f, 18f, 196f, 40f);
+            Ui.Fill(p, MenuInk, 20f);
+            Ui.Border(p, new Color(MenuMint.r, MenuMint.g, MenuMint.b, 0.35f), 1.5f, 20f);
+            if (DrawSlotButton(p)) Toggle();
+        }
+
+        bool DrawSlotButton(Rect r)
+        {
+            bool hover = Ui.Hover(r) || TestHover;
+            float h = r.height;
+            if (hover)
+            {
+                // the slot lights up from inside, like the menu's own lit buttons
+                var glow = new Rect(r.x + h * 0.12f, r.y + h * 0.14f, r.width - h * 0.24f, h * 0.72f);
+                Ui.Fill(glow, new Color(MenuLime.r, MenuLime.g, MenuLime.b, 0.10f), glow.height / 2f);
+            }
+            int size = Mathf.Clamp(Mathf.RoundToInt(h * 0.5f), 11, 40);
+            float x = r.x + h * 0.5f;
+            // the REC light: on while the menu waits, brighter on hover
+            float dot = Mathf.Max(3f, h * 0.11f);
+            float pulse = hover ? 1f : 0.65f + 0.35f * Mathf.Sin(Time.unscaledTime * 2.4f);
+            Ui.Circle(new Vector2(x + dot, r.center.y), dot * 1.9f, new Color(MenuRec.r, MenuRec.g, MenuRec.b, 0.18f * pulse));
+            Ui.Circle(new Vector2(x + dot, r.center.y), dot, new Color(MenuRec.r, MenuRec.g, MenuRec.b, 0.55f + 0.45f * pulse));
+            x += dot * 2f + h * 0.28f;
+
+            // the game's lettering: bold italic, lime on a dark outline
+            const string label = "REPLAYS";
+            float tw = Ui.Measure(label, size, true) + 8f;
+            var tr = new Rect(x, r.y, tw, h);
+            float o = Mathf.Max(1f, h * 0.035f);
+            foreach (var d in new[] { new Vector2(-o, 0f), new Vector2(o, 0f), new Vector2(0f, -o), new Vector2(0f, o), new Vector2(o, o) })
+                Ui.Text(new Rect(tr.x + d.x, tr.y + d.y, tr.width, tr.height), label, size, MenuInk, true);
+            Ui.Text(tr, label, size, hover ? MenuLit : MenuLime, true);
+
+            // the shortcut, quietly, at the far end
+            string key = Plugin.BrowserKey.Value.ToString();
+            int ks = Mathf.Clamp(Mathf.RoundToInt(h * 0.3f), 9, 22);
+            float kw = Ui.Measure(key, ks, true) + 6f;
+            if (x + tw + kw + h * 0.3f < r.xMax - h * 0.35f)
+                Ui.Text(new Rect(r.xMax - h * 0.45f - kw, r.y, kw, h), key, ks, MenuMint, true, TextAnchor.MiddleRight);
+
+            if (hover) Ui.Tip(r, "Your recorded rounds, markers and highlights");
+            return GUI.Button(r, GUIContent.none, GUIStyle.none);
         }
 
         void DrawContents(Rect win)

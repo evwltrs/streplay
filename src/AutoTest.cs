@@ -198,6 +198,11 @@ namespace Streplay
                 case "hlwatch": ReplayBrowser.Instance.TestWatchHighlight(int.Parse(a[1])); return WaitForReplay();
                 case "nexttake": ScoreManager.Instance.TakeIndex++; Log($"take index {ScoreManager.Instance.TakeIndex}"); return null;
                 case "browser": ReplayBrowser.Instance.TestSetOpen(a[1] == "on"); return null;
+                case "menuui": MenuUi(); return null;
+                case "openmenu": MenuController.Instance?.OpenGame(); return null;
+                case "menubutton": ReplayBrowser.TestHideButton = a[1] == "off"; return null;
+                case "slotdiag": Log(MenuSlot.Diag()); return null;
+                case "menuhover": ReplayBrowser.TestHover = a[1] == "on"; return null;
                 case "eventsys": Log("EventSystems: " + string.Join(", ", FindObjectsOfType<UnityEngine.EventSystems.EventSystem>(true).Select(e => $"{e.name} enabled={e.enabled}"))); return null;
                 case "renderasync": { var r = Render(rp, a); StartCoroutine(r); return null; }
                 case "rendercancel": rp.TestCancelRender(); return null;
@@ -212,6 +217,81 @@ namespace Streplay
         //   localsound jump        FirstPersonController.JumpClip (PlayOneShot outside any RPC)
         //   localsound ui          SoundManager.PlaySoundWithPitch (2D)
         //   localsound loop on|off the fall-wind loop (Play/Stop on a networked source)
+        // Map of the main menu's visible buttons (for fitting Streplay's own button in): path, label, font, rect on
+        // screen, sprite, and which game scripts drive it. Written to <ReplayFolder>\autotest\menuui.txt.
+        static void MenuUi()
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine($"screen {Screen.width}x{Screen.height}");
+            foreach (var c in Resources.FindObjectsOfTypeAll<Canvas>())
+            {
+                if (c == null || !c.gameObject.scene.IsValid() || !c.isRootCanvas || !c.isActiveAndEnabled) continue;
+                sb.AppendLine($"== canvas {Recorder.ScenePath(c.transform)} mode={c.renderMode} cam={(c.worldCamera ? c.worldCamera.name : "-")} scale={c.scaleFactor} order={c.sortingOrder}");
+                foreach (var sel in c.GetComponentsInChildren<UnityEngine.UI.Selectable>(false))
+                {
+                    if (!sel.isActiveAndEnabled) continue;
+                    var rt = (RectTransform)sel.transform;
+                    var corners = new Vector3[4];
+                    rt.GetWorldCorners(corners);
+                    var cam = c.renderMode == RenderMode.ScreenSpaceOverlay ? null : c.worldCamera;
+                    Vector2 a = RectTransformUtility.WorldToScreenPoint(cam, corners[0]), b = RectTransformUtility.WorldToScreenPoint(cam, corners[2]);
+                    var tmp = sel.GetComponentInChildren<TMPro.TMP_Text>(false);
+                    var img = sel.GetComponent<UnityEngine.UI.Image>();
+                    var scripts = string.Join(",", sel.GetComponents<MonoBehaviour>().Select(m => m.GetType().Name).Distinct());
+                    sb.AppendLine($"  {sel.GetType().Name} {Recorder.ScenePath(sel.transform)}");
+                    sb.AppendLine($"     screen x={a.x:0}-{b.x:0} y={Screen.height - b.y:0}-{Screen.height - a.y:0} (from top)  size={b.x - a.x:0}x{b.y - a.y:0}");
+                    if (tmp != null) sb.AppendLine($"     text '{tmp.text}' font={tmp.font?.name} size={tmp.fontSize} color={tmp.color} style={tmp.fontStyle} align={tmp.alignment}");
+                    if (img != null) sb.AppendLine($"     image sprite={img.sprite?.name} color={img.color} type={img.type}");
+                    sb.AppendLine($"     scripts {scripts}");
+                }
+            }
+            foreach (var cm in Camera.allCameras)
+                sb.AppendLine($"  CAM {cm.name} depth={cm.depth} mask={cm.cullingMask:X8} rt={(cm.targetTexture ? cm.targetTexture.name + " " + cm.targetTexture.width + "x" + cm.targetTexture.height : "screen")} ortho={cm.orthographic} size={cm.orthographicSize} fov={cm.fieldOfView} rect={cm.rect} pixelRect={cm.pixelRect} pos={cm.transform.position} rot={cm.transform.eulerAngles}");
+            foreach (var n in new[] { "lobbyname", "back_button", "play_button", "settings_button" })
+            {
+                var go = Resources.FindObjectsOfTypeAll<Renderer>().FirstOrDefault(x => x != null && x.gameObject.scene.IsValid() && x.name == n);
+                if (go == null) continue;
+                foreach (var cm in Camera.allCameras.Where(cm => (cm.cullingMask & (1 << go.gameObject.layer)) != 0))
+                {
+                    var b0 = cm.WorldToScreenPoint(go.bounds.min); var b1 = cm.WorldToScreenPoint(go.bounds.max);
+                    sb.AppendLine($"  PROJ {n} via {cm.name}: ({b0.x:0},{b0.y:0},{b0.z:0.0}) - ({b1.x:0},{b1.y:0},{b1.z:0.0})");
+                }
+            }
+            // every visible 3D part of the menu frame (the bar, the back arrow, the slots), with its box on screen
+            foreach (var r in Resources.FindObjectsOfTypeAll<Renderer>())
+            {
+                if (r == null || !r.gameObject.scene.IsValid() || !r.enabled || !r.gameObject.activeInHierarchy || r is ParticleSystemRenderer) continue;
+                string rpath = Recorder.ScenePath(r.transform);
+                if (!rpath.StartsWith("---USER INTERFACE---", StringComparison.Ordinal)) continue;
+                var cam = Camera.allCameras.Where(cm => (cm.cullingMask & (1 << r.gameObject.layer)) != 0).OrderByDescending(cm => cm.depth).FirstOrDefault();
+                if (cam == null) continue;
+                var bb = r.bounds;
+                float x0 = float.MaxValue, y0 = float.MaxValue, x1 = float.MinValue, y1 = float.MinValue;
+                for (int i = 0; i < 8; i++)
+                {
+                    var c = bb.center + Vector3.Scale(bb.extents, new Vector3((i & 1) == 0 ? -1 : 1, (i & 2) == 0 ? -1 : 1, (i & 4) == 0 ? -1 : 1));
+                    var sp = cam.WorldToScreenPoint(c);
+                    x0 = Mathf.Min(x0, sp.x); x1 = Mathf.Max(x1, sp.x); y0 = Mathf.Min(y0, Screen.height - sp.y); y1 = Mathf.Max(y1, Screen.height - sp.y);
+                }
+                var mat = r.sharedMaterial;
+                sb.AppendLine($"  R {rpath} [{r.GetType().Name}] cam={cam.name} layer={r.gameObject.layer} world x={bb.min.x:0}-{bb.max.x:0} y={bb.min.y:0}-{bb.max.y:0} z={bb.min.z:0}-{bb.max.z:0} lossy={r.transform.lossyScale.x:0.##} mat={(mat ? mat.name : "-")} tex={(mat && mat.mainTexture ? mat.mainTexture.name : "-")}");
+            }
+            // 3D menu buttons on the bar (ModelButtonHandler)
+            foreach (var mb in Resources.FindObjectsOfTypeAll<MonoBehaviour>())
+            {
+                if (mb == null || !mb.gameObject.scene.IsValid() || !mb.isActiveAndEnabled) continue;
+                string n = mb.GetType().Name;
+                if (n != "ModelButtonHandler" && n != "ModelButtonTween") continue;
+                var cam = Camera.allCameras.FirstOrDefault(cm => (cm.cullingMask & (1 << mb.gameObject.layer)) != 0);
+                var sp = cam != null ? cam.WorldToScreenPoint(mb.transform.position) : Vector3.zero;
+                sb.AppendLine($"  3D {n} {Recorder.ScenePath(mb.transform)} layer={mb.gameObject.layer} cam={(cam ? cam.name : "-")} screen=({sp.x:0},{Screen.height - sp.y:0})");
+            }
+            string path = Path.Combine(Plugin.ReplayFolder.Value, "autotest", "menuui.txt");
+            Directory.CreateDirectory(Path.GetDirectoryName(path));
+            File.WriteAllText(path, sb.ToString());
+            Log("wrote " + path);
+        }
+
         static void LocalSound(string what, string arg)
         {
             var fpc = Settings.Instance != null ? Settings.Instance.localPlayer : null;
