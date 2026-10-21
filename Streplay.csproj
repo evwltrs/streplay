@@ -69,14 +69,17 @@
     <Message Importance="high" Condition="'@(_Deployed)' == ''" Text="Streplay NOT deployed (close the game and build again)" />
   </Target>
 
-  <!-- dotnet build -c Release -t:Pack  ->  dist\1nf-Streplay-<version>.zip, ready to upload to Thunderstore -->
-  <Target Name="Pack" DependsOnTargets="Build">
-    <Error Condition="'$(Configuration)' != 'Release'" Text="Pack a Release build: dotnet build -c Release -t:Pack" />
-    <ReadLinesFromFile File="thunderstore\manifest.json">
-      <Output TaskParameter="Lines" ItemName="_ManifestLines" />
-    </ReadLinesFromFile>
-    <Error Condition="!$([System.String]::Copy('@(_ManifestLines)').Contains('&quot;version_number&quot;: &quot;$(Version)&quot;'))"
+  <!-- dotnet build -c Release -t:ThunderstorePack  ->  dist\1nf-Streplay-<version>.zip, ready to upload to Thunderstore -->
+  <Target Name="ThunderstorePack" DependsOnTargets="Build">
+    <Error Condition="'$(Configuration)' != 'Release'" Text="Pack a Release build: dotnet build -c Release -t:ThunderstorePack" />
+    <PropertyGroup>
+      <_Manifest>$([System.IO.File]::ReadAllText('$(MSBuildProjectDirectory)\thunderstore\manifest.json'))</_Manifest>
+      <_PluginCs>$([System.IO.File]::ReadAllText('$(MSBuildProjectDirectory)\src\Plugin.cs'))</_PluginCs>
+    </PropertyGroup>
+    <Error Condition="!$(_Manifest.Contains('&quot;version_number&quot;: &quot;$(Version)&quot;'))"
            Text="thunderstore\manifest.json version_number does not match $(Version)" />
+    <Error Condition="!$(_PluginCs.Contains('Version = &quot;$(Version)&quot;'))"
+           Text="src\Plugin.cs Version does not match $(Version)" />
     <PropertyGroup>
       <_Stage>$(MSBuildProjectDirectory)\obj\thunderstore</_Stage>
       <_Zip>$(MSBuildProjectDirectory)\dist\1nf-Streplay-$(Version).zip</_Zip>
