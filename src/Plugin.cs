@@ -196,6 +196,7 @@ namespace Streplay
             TryPatch("sound capture", () => AudioCapture.Install(harmony));
             TryPatch("pause menu suspension", () => harmony.PatchAll(typeof(GameSuspend)));
             TryPatch("kill detection", () => harmony.PatchAll(typeof(KillHook)));
+            TryPatch("replay log noise filter", () => harmony.PatchAll(typeof(ReplayNoise)));
 
             // Own host object so we survive any scene changes regardless of what happens to BepInEx's manager.
             Host = new GameObject("Streplay");

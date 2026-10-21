@@ -41,7 +41,7 @@ namespace Streplay
                     foreach (var root in SceneManager.GetActiveScene().GetRootGameObjects())
                         Dump(sb, root.transform, 0);
                 }
-                string path = Path.Combine(Plugin.ReplayFolder.Value, $"dump_{DateTime.Now:yyyyMMdd_HHmmss}.txt");
+                string path = Path.Combine(Plugin.ReplayFolder.Value, "dump_" + DateTime.Now.ToString("yyyyMMdd_HHmmss", System.Globalization.CultureInfo.InvariantCulture) + ".txt");
                 File.WriteAllText(path, sb.ToString());
                 Plugin.Log.LogInfo($"Wrote {path}");
             }

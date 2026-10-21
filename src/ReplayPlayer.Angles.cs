@@ -489,7 +489,7 @@ namespace Streplay
                     float score = seen * 10f + across * 4f - dist * 0.25f - Mathf.Abs(elev - 24f) * 0.04f;
                     if (score > best) { best = score; _staticPos = cam; _staticLook = centre; }
                 }
-            Plugin.Log.LogInfo($"[angle] static: {chests.Count} players, camera {Vector3.Distance(_staticPos, centre):0.0} m from them");
+            Plugin.Log.LogDebug($"[angle] static: {chests.Count} players, camera {Vector3.Distance(_staticPos, centre):0.0} m from them");
         }
 
         // a clear line between two points (players and triggers don't count)

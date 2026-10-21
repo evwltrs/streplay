@@ -162,7 +162,7 @@ namespace Streplay
             foreach (var p in _puppets)
             {
                 if (p != null && p.Info.IsPlayer)
-                    Plugin.Log.LogInfo($"[held] player obj={p.Info.ObjectId} {p.DisplayName} seen={p.Seen} heldR={p.HeldRight} heldL={p.HeldLeft} " +
+                    Plugin.Log.LogDebug($"[held] player obj={p.Info.ObjectId} {p.DisplayName} seen={p.Seen} heldR={p.HeldRight} heldL={p.HeldLeft} " +
                                        $"pickup={(p.Pickup != null)} points={p.HandPoints.Length} " +
                                        $"itemPuppetR={(p.HeldRight >= 0 && p.HeldRight < _puppets.Length ? (_puppets[p.HeldRight]?.Info.Name ?? "none") : "-")}");
                 if (p == null || !p.Seen || p.HandPoints.Length == 0) continue;
@@ -173,7 +173,7 @@ namespace Streplay
                     var point = p.HandPoints.Length > hand ? p.HandPoints[hand] : null;
                     if (point == null) continue;
                     var s = _puppets[idx].CurS;
-                    Plugin.Log.LogInfo($"[held] {p.DisplayName}{(p.IsLocalPlayer ? " (you)" : "")} hand{hand} {_puppets[idx].Info.Name}: " +
+                    Plugin.Log.LogDebug($"[held] {p.DisplayName}{(p.IsLocalPlayer ? " (you)" : "")} hand{hand} {_puppets[idx].Info.Name}: " +
                                        $"item→handpoint {Vector3.Distance(item.position, point.position):0.000}m, " +
                                        $"recorded→handpoint {(s != null ? Vector3.Distance(s.Pos, point.position) : -1):0.000}m, " +
                                        $"item scale {item.lossyScale.x:0.00}, body→item {Vector3.Distance(p.Go.transform.position, item.position):0.00}m");
@@ -999,7 +999,8 @@ namespace Streplay
         {
             if (t < 0) t = 0;
             int m = (int)(t / 60);
-            return $"{m}:{t - m * 60:00.00}";
+            // invariant: callers split on '.' and the result ends up in file names
+            return string.Format(System.Globalization.CultureInfo.InvariantCulture, "{0}:{1:00.00}", m, t - m * 60);
         }
     }
 }

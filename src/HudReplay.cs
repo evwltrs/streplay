@@ -61,6 +61,69 @@ namespace Streplay
         readonly List<GameObject> _activated = new List<GameObject>();
         readonly List<Behaviour> _enabled = new List<Behaviour>();
         readonly List<Graphic> _suppressed = new List<Graphic>();
+
+        // The HUD objects we drive are the game's own and live on after the replay (DontDestroyOnLoad), and nothing in
+        // the game turns them back on, so everything Apply touches is put back exactly as it was in Hide.
+        sealed class Snap
+        {
+            public Component C;
+            public bool Enabled;
+            public float Alpha;
+            public Color Color;
+            public Sprite Sprite;
+            public float Fill;
+            public string Text;
+            public TMP_SpriteAsset SpriteAsset;
+            public Vector2 Pos, Size;
+            public Vector3 Scale;
+            public Quaternion Rot;
+        }
+        readonly List<Snap> _snaps = new List<Snap>();
+
+        void TakeSnapshots()
+        {
+            _snaps.Clear();
+            foreach (var b in _bound)
+            {
+                if (b.C == null || b.Info.Dynamic) continue; // dynamic pieces are our own objects
+                var sn = new Snap { C = b.C };
+                if (b.C is CanvasGroup cg) sn.Alpha = cg.alpha;
+                else if (b.C is Graphic g)
+                {
+                    sn.Enabled = g.enabled;
+                    sn.Color = g.color;
+                    if (g is Image img) { sn.Sprite = img.sprite; sn.Fill = img.fillAmount; }
+                    if (g is TMP_Text tmp) { sn.Text = tmp.text; sn.SpriteAsset = tmp.spriteAsset; }
+                    else if (g is Text txt) sn.Text = txt.text;
+                    var rt = g.rectTransform;
+                    sn.Pos = rt.anchoredPosition; sn.Size = rt.sizeDelta; sn.Scale = rt.localScale; sn.Rot = rt.localRotation;
+                }
+                else continue;
+                _snaps.Add(sn);
+            }
+        }
+
+        void RestoreSnapshots()
+        {
+            foreach (var sn in _snaps)
+            {
+                try
+                {
+                    if (sn.C == null) continue;
+                    if (sn.C is CanvasGroup cg) { cg.alpha = sn.Alpha; continue; }
+                    var g = (Graphic)sn.C;
+                    g.color = sn.Color;
+                    if (g is Image img) { img.sprite = sn.Sprite; img.fillAmount = sn.Fill; }
+                    if (g is TMP_Text tmp) { tmp.spriteAsset = sn.SpriteAsset; if (tmp.text != sn.Text) tmp.text = sn.Text; }
+                    else if (g is Text txt) txt.text = sn.Text;
+                    var rt = g.rectTransform;
+                    rt.anchoredPosition = sn.Pos; rt.sizeDelta = sn.Size; rt.localScale = sn.Scale; rt.localRotation = sn.Rot;
+                    g.enabled = sn.Enabled;
+                }
+                catch (Exception e) { Plugin.Log.LogDebug($"HUD restore: {e.Message}"); }
+            }
+            _snaps.Clear();
+        }
         readonly List<(CanvasGroup g, float a)> _groupAlpha = new List<(CanvasGroup, float)>();
         readonly List<(Transform t, Vector3 scale)> _expanded = new List<(Transform, Vector3)>();
         Dictionary<string, Sprite> _sprites;
@@ -117,7 +180,7 @@ namespace Streplay
                 }
                 _logBirths.Sort();
             }
-            Plugin.Log.LogInfo($"HUD: {_bound.Count} elements bound ({created} rebuilt)" + (missing > 0 ? $", {missing} not found" : "") +
+            Plugin.Log.LogDebug($"HUD: {_bound.Count} elements bound ({created} rebuilt)" + (missing > 0 ? $", {missing} not found" : "") +
                                (_logBirths.Count > 0 ? $", {_logBirths.Count} kill feed lines restacked" : ""));
         }
 
@@ -198,6 +261,7 @@ namespace Streplay
         {
             if (Shown || _bound.Count == 0) return;
             Shown = true;
+            TakeSnapshots();
             var keep = new HashSet<Component>(_bound.Where(b => b.C != null).Select(b => b.C));
             _keep = keep;
             var roots = new HashSet<Canvas>();
@@ -244,6 +308,7 @@ namespace Streplay
             _groupAlpha.Clear();
             foreach (var g in _suppressed) if (g != null) g.enabled = true;
             _suppressed.Clear();
+            RestoreSnapshots();
             foreach (var b in _enabled) if (b != null) b.enabled = false;
             _enabled.Clear();
             for (int i = _activated.Count - 1; i >= 0; i--) if (_activated[i] != null) _activated[i].SetActive(false);
@@ -268,7 +333,7 @@ namespace Streplay
             }
             var hit = _bound.Where(b => b.Collapsed != null).ToList();
             if (hit.Count > 0)
-                Plugin.Log.LogInfo($"HUD: {hit.Count} recorded elements sit in collapsed containers (" +
+                Plugin.Log.LogDebug($"HUD: {hit.Count} recorded elements sit in collapsed containers (" +
                                    string.Join(", ", hit.SelectMany(b => b.Collapsed).Distinct().Take(4).Select(t => $"{t.name} scale {t.localScale.x:0.###}")) + ")" +
                                    (_data.Header.Version < 7 ? ", kept hidden" : ""));
         }
@@ -301,7 +366,7 @@ namespace Streplay
                     if (!RectTransformUtility.RectangleContainsScreenPoint(g.rectTransform, target, cam)) continue;
                     var tex = g.mainTexture;
                     var c = g.canvas;
-                    Plugin.Log.LogInfo($"[probe {when}] {Recorder.ScenePath(g.transform)} {g.GetType().Name} recorded={keep.Contains(g)} rect={g.rectTransform.rect.size} lossy={g.transform.lossyScale.x:0.####} " +
+                    Plugin.Log.LogDebug($"[probe {when}] {Recorder.ScenePath(g.transform)} {g.GetType().Name} recorded={keep.Contains(g)} rect={g.rectTransform.rect.size} lossy={g.transform.lossyScale.x:0.####} " +
                                        $"tex={(tex != null ? tex.name + " " + tex.width + "x" + tex.height : "-")} canvas={(c != null ? c.name + " " + c.renderMode + " order " + c.sortingOrder : "-")}");
                 }
             }
@@ -320,7 +385,7 @@ namespace Streplay
                     bool custom = m != null && m != Graphic.defaultGraphicMaterial;
                     if (!custom && b.Info.Path.IndexOf("rosshair", StringComparison.Ordinal) < 0) continue;
                     var img = g as Image;
-                    Plugin.Log.LogInfo($"[hud] {b.Info.Path}: material={(m != null ? m.name : "null")} shader={(m != null && m.shader != null ? m.shader.name : "null")} " +
+                    Plugin.Log.LogDebug($"[hud] {b.Info.Path}: material={(m != null ? m.name : "null")} shader={(m != null && m.shader != null ? m.shader.name : "null")} " +
                                        $"sprite={(img != null && img.sprite != null ? $"{img.sprite.name} tex={img.sprite.texture?.name} rect={img.sprite.textureRect} packed={img.sprite.packed}" : "-")} " +
                                        $"type={(img != null ? img.type.ToString() : "-")} size={g.rectTransform.rect.size}");
                 }
@@ -347,11 +412,11 @@ namespace Streplay
             {
                 _renderersListed = true;
                 var all = _moved.SelectMany(m => m.c.GetComponentsInChildren<Renderer>(true)).ToList();
-                Plugin.Log.LogInfo($"[render] 3D renderers in the HUD canvases ({all.Count}): " +
+                Plugin.Log.LogDebug($"[render] 3D renderers in the HUD canvases ({all.Count}): " +
                                    string.Join(", ", all.Take(12).Select(r => $"{Recorder.ScenePath(r.transform)} {r.GetType().Name} on={r.enabled && r.gameObject.activeInHierarchy}")));
             }
             if (_hiddenRenderers.Count > 0)
-                Plugin.Log.LogInfo($"[render] hid {_hiddenRenderers.Count} 3D renderers inside the HUD canvases: " +
+                Plugin.Log.LogDebug($"[render] hid {_hiddenRenderers.Count} 3D renderers inside the HUD canvases: " +
                                    string.Join(", ", _hiddenRenderers.Take(6).Select(r => $"{r.name} ({r.GetType().Name})")));
         }
 
@@ -407,7 +472,7 @@ namespace Streplay
                 {
                     if (!(b.C is Image im) || im == null || b.Info.Path.IndexOf("/Crosshair", StringComparison.Ordinal) < 0) continue;
                     var sp = im.sprite;
-                    Plugin.Log.LogInfo($"[xhair] frame {frame} sprite={(sp != null ? $"{sp.name}#{sp.GetInstanceID()} rect={sp.rect} tex={sp.texture?.name}" : "null")} " +
+                    Plugin.Log.LogDebug($"[xhair] frame {frame} sprite={(sp != null ? $"{sp.name}#{sp.GetInstanceID()} rect={sp.rect} tex={sp.texture?.name}" : "null")} " +
                                        $"override={(im.overrideSprite != null ? im.overrideSprite.name + "#" + im.overrideSprite.GetInstanceID() : "-")} type={im.type} " +
                                        $"size={im.rectTransform.rect.size} scale={im.rectTransform.localScale} mat={im.materialForRendering?.name} canvas={im.canvas?.renderMode}");
                 }
@@ -551,7 +616,7 @@ namespace Streplay
                     if (t.Name != "IconLoader") continue;
                     var m = t.GetMethod("EnsureLoaded", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic, null, Type.EmptyTypes, null);
                     if (m == null) continue;
-                    try { m.Invoke(null, null); Plugin.Log.LogInfo($"[hud] loaded kill feed icons from {asm.GetName().Name}"); }
+                    try { m.Invoke(null, null); Plugin.Log.LogDebug($"[hud] loaded kill feed icons from {asm.GetName().Name}"); }
                     catch (Exception e) { Plugin.Log.LogWarning($"[hud] {asm.GetName().Name} could not load its icons: {e.InnerException?.Message ?? e.Message}"); }
                 }
             }
@@ -580,7 +645,7 @@ namespace Streplay
             // from the menu has none yet: ask it to load (once)
             if (best == null && !_askedIconMods) { _askedIconMods = true; LoadIconMods(); Scan(); }
             _spriteAssetFor[key] = best;
-            if (best != null) Plugin.Log.LogInfo($"[hud] kill feed icons from sprite asset '{best.name}' ({bestCount}/{names.Count} of {key})");
+            if (best != null) Plugin.Log.LogDebug($"[hud] kill feed icons from sprite asset '{best.name}' ({bestCount}/{names.Count} of {key})");
             else Plugin.Log.LogWarning($"[hud] no loaded sprite asset has the icons {key}");
             return best;
         }
@@ -606,7 +671,7 @@ namespace Streplay
                 b.Groups = byPath.Values.ToList();
                 linked++;
             }
-            if (linked > 0) Plugin.Log.LogInfo($"HUD: {linked} rebuilt pieces follow their recorded group fades");
+            if (linked > 0) Plugin.Log.LogDebug($"HUD: {linked} rebuilt pieces follow their recorded group fades");
         }
 
         // UI the game turns on while a replay plays (a kill feed line from a replayed effect or a mod, a chat message
@@ -632,7 +697,7 @@ namespace Streplay
                     if (n++ == 0) first = g.name;
                 }
             }
-            if (n > 0 && !now) Plugin.Log.LogInfo($"[hud] hid {n} piece(s) of UI the game showed during the replay (e.g. {first})");
+            if (n > 0 && !now) Plugin.Log.LogDebug($"[hud] hid {n} piece(s) of UI the game showed during the replay (e.g. {first})");
         }
 
         internal static bool IsTmpSubMesh(string path)

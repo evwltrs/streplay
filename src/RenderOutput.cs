@@ -147,7 +147,7 @@ namespace Streplay
                           "-vf \"vflip,scale=out_color_matrix=bt709:out_range=tv\" " +
                           $"{codec} -colorspace bt709 -color_primaries bt709 -color_trc bt709 " +
                           (format == RenderFormat.ProRes4444 ? "" : "-movflags +faststart ") + $"\"{output}\"";
-            Plugin.Log.LogInfo($"[render] {ffmpeg} {args}");
+            Plugin.Log.LogDebug($"[render] {ffmpeg} {args}");
             _proc = Run(ffmpeg, args, true);
             _stdin = _proc.StandardInput.BaseStream;
             StartWorkers(1); // one writer keeps frames in order
@@ -191,7 +191,7 @@ namespace Streplay
             try { _stdin.Flush(); _stdin.Close(); } catch (IOException) { }
             _proc.WaitForExit();
             if (_proc.ExitCode != 0) throw new IOException($"ffmpeg exit code {_proc.ExitCode}: {LastLog()}");
-            Plugin.Log.LogInfo($"[render] ffmpeg finished {OutputPath}" + (LastLog().Length > 0 ? $" ({LastLog()})" : ""));
+            Plugin.Log.LogDebug($"[render] ffmpeg finished {OutputPath}" + (LastLog().Length > 0 ? $" ({LastLog()})" : ""));
             if (!cancelled && _audio != null) try { File.Delete(_audio); } catch (IOException) { }
         }
     }
@@ -205,11 +205,16 @@ namespace Streplay
         {
             var candidates = new List<string>();
             string cfg = Plugin.FfmpegPath.Value?.Trim().Trim('"');
+            // a malformed setting or PATH entry (stray quotes, <>|) is skipped rather than thrown: this runs from the GUI
             if (!string.IsNullOrEmpty(cfg))
             {
                 candidates.Add(cfg);
-                candidates.Add(Path.Combine(cfg, "ffmpeg.exe"));
-                candidates.Add(Path.Combine(cfg, "bin", "ffmpeg.exe"));
+                try
+                {
+                    candidates.Add(Path.Combine(cfg, "ffmpeg.exe"));
+                    candidates.Add(Path.Combine(cfg, "bin", "ffmpeg.exe"));
+                }
+                catch { /* not a folder path */ }
             }
             candidates.Add(Path.Combine(DropFolder, "ffmpeg.exe"));
             candidates.Add(Path.Combine(DropFolder, "bin", "ffmpeg.exe"));
@@ -226,7 +231,10 @@ namespace Streplay
             }
             catch { }
             foreach (var dir in (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator))
-                if (dir.Trim().Length > 0) candidates.Add(Path.Combine(dir.Trim().Trim('"'), "ffmpeg.exe"));
+            {
+                try { if (dir.Trim().Length > 0) candidates.Add(Path.Combine(dir.Trim().Trim('"'), "ffmpeg.exe")); }
+                catch { /* malformed PATH entry */ }
+            }
             foreach (var c in candidates)
             {
                 try { if (c.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) && File.Exists(c)) return Path.GetFullPath(c); }

@@ -1,3 +1,4 @@
+using System;
 using HarmonyLib;
 
 namespace Streplay
@@ -16,5 +17,20 @@ namespace Streplay
         [HarmonyPatch(typeof(PauseManager), "Menu")]
         [HarmonyPrefix]
         static bool PauseManagerMenu() => !ReplayPlayer.SuspendGame;
+    }
+
+    // Two game methods throw harmlessly on a replay's offline copies (the map's kill cam being switched off, and a player
+    // copy's PlayerHealth start-up that expects a live match). The exceptions only clutter the log, so they're dropped,
+    // but only while a replay is open; in normal play the game behaves exactly as without the mod.
+    [HarmonyPatch]
+    internal static class ReplayNoise
+    {
+        [HarmonyPatch(typeof(KillCam), "OnDisable")]
+        [HarmonyFinalizer]
+        static Exception KillCamOnDisable(Exception __exception) => ReplayPlayer.Active ? null : __exception;
+
+        [HarmonyPatch(typeof(PlayerHealth), "Awake___UserLogic")]
+        [HarmonyFinalizer]
+        static Exception PlayerHealthAwake(Exception __exception) => ReplayPlayer.Active ? null : __exception;
     }
 }

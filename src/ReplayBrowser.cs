@@ -136,7 +136,7 @@ namespace Streplay
             Rect Hb(string l) { float w = Ui.AutoW(l, null, 32f, 12); bx -= w; var r = new Rect(bx, y + 3f, w, 32f); bx -= 4f; return r; }
             if (Ui.Button(new Rect(right - 34f, y + 3f, 34f, 32f), "", false, Ui.Kind.Ghost, Ui.IconClose, 12, "Close (Esc)")) _open = false;
             bx -= 42f;
-            if (Ui.Button(Hb("Folder"), "Folder", false, Ui.Kind.Normal, null, 12, "Open the replay folder")) Application.OpenURL("file:///" + Plugin.ReplayFolder.Value.Replace('\\', '/'));
+            if (Ui.Button(Hb("Folder"), "Folder", false, Ui.Kind.Normal, null, 12, "Open the replay folder")) Ui.OpenFolder(Plugin.ReplayFolder.Value);
             if (Ui.Button(Hb("Refresh"), "Refresh", false, Ui.Kind.Normal, null, 12)) Refresh();
             y += 50f;
 
@@ -383,7 +383,7 @@ namespace Streplay
 
 
         static string MatchId(ReplayMeta m) =>
-            string.IsNullOrEmpty(m.SessionId) ? m.StartUtc.ToLocalTime().ToString("yyyy-MM-dd") : m.SessionId;
+            string.IsNullOrEmpty(m.SessionId) ? m.StartUtc.ToLocalTime().ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) : m.SessionId;
 
         void Play(ReplayMeta m, float t, float? inPoint = null, float? outPoint = null)
         {

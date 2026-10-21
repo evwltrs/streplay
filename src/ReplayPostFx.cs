@@ -81,7 +81,7 @@ namespace Streplay
                             if (Settings.Instance != null) _grading.gamma.value = new Vector4(1f, 1f, 1f, Settings.Instance.brightness - 1f);
                         }
                     }
-                    Plugin.Log.LogInfo($"[pp] {dst.name}: volume '{vol.sharedProfile.name}' layer {vol.gameObject.layer} (" +
+                    Plugin.Log.LogDebug($"[pp] {dst.name}: volume '{vol.sharedProfile.name}' layer {vol.gameObject.layer} (" +
                                        string.Join(", ", v.sharedProfile.settings.Where(s => s != null && s.active).Select(s => s.GetType().Name)) + ")");
                 }
             }

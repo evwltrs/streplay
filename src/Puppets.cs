@@ -234,7 +234,7 @@ namespace Streplay
                 else Plugin.Log.LogWarning($"Hat '{c.Hat}' not found in CosmeticsManager");
             }
             string line = $"Cosmetics for {p.DisplayName}: {(applied.Count > 0 ? string.Join(", ", applied) : "none")}";
-            if (LoggedCosmetics.Add(line)) Plugin.Log.LogInfo(line); // once per player, not per life
+            if (LoggedCosmetics.Add(line)) Plugin.Log.LogDebug(line); // once per player, not per life
         }
 
         internal static GameObject Wear(GameObject prefab, Transform anchor, int layer)

@@ -48,14 +48,20 @@ namespace Streplay
 
         // true from opening a replay until the main menu is back, see GameSuspend
         static bool _returningToMenu;
-        public static bool SuspendGame => Active || _returningToMenu;
+        static float _returningSince;
+        // the menu should be back within seconds; never leave the game's pause menu switched off for the session
+        public static bool SuspendGame => Active || (_returningToMenu && Time.unscaledTime - _returningSince < 30f);
 
         void Awake()
         {
             Instance = this;
             SceneManager.sceneLoaded += (scene, _) =>
             {
-                if (scene.name != "MainMenu") return;
+                if (scene.name != "MainMenu")
+                {
+                    if (!Active) _returningToMenu = false; // some other scene came up instead of the menu
+                    return;
+                }
                 _returningToMenu = false;
                 if (_leaveLobbyOnMenu) { _leaveLobbyOnMenu = false; StartCoroutine(LeaveLobbySoon()); }
             };
@@ -118,6 +124,7 @@ namespace Streplay
             {
                 Plugin.Log.LogError($"Could not read replay: {e}");
                 _loadError = e.Message;
+                MenuNotice = $"Couldn't open {meta.ReplayFile}: {e.Message}";
                 _phase = Phase.Idle;
                 Active = false;
                 yield break;
@@ -127,6 +134,7 @@ namespace Streplay
             if (!Application.CanStreamedLevelBeLoaded(scene))
             {
                 _loadError = $"Map '{scene}' isn't available in this version of the game.";
+                MenuNotice = _loadError;
                 _phase = Phase.Idle;
                 Active = false;
                 yield break;
@@ -150,7 +158,12 @@ namespace Streplay
             }
             catch (Exception e)
             {
+                // a half set-up replay would only throw every frame: back to the menu, with the reason
                 Plugin.Log.LogError($"Replay setup failed: {e}");
+                _phase = Phase.Ready; // so Exit tears down what was built
+                Exit();
+                MenuNotice = $"Couldn't play {meta.ReplayFile}: {e.Message}";
+                yield break;
             }
 
             _phase = Phase.Ready;
@@ -162,7 +175,9 @@ namespace Streplay
             FindLocalKills();
             _lastEye.Clear();
             Seek(Mathf.Clamp(startAt, 0f, _data.Duration));
-            Plugin.Log.LogInfo($"Physics autoSimulation={Physics.autoSimulation} fixedDelta={Time.fixedDeltaTime}");
+            if (!string.IsNullOrEmpty(_data.Header.GameVersion) && _data.Header.GameVersion != Application.version)
+                Toast($"Recorded on game version {_data.Header.GameVersion} (you have {Application.version}): some objects may be missing", 6f);
+            Plugin.Log.LogDebug($"Physics autoSimulation={Physics.autoSimulation} fixedDelta={Time.fixedDeltaTime}");
             try { LogPuppetDiagnostics(); } catch (Exception e) { Plugin.Log.LogWarning($"Diagnostics failed: {e.Message}"); }
             Plugin.Log.LogInfo($"Playing {_meta.ReplayFile}: {_data.Frames.Count} frames, {_data.Objects.Count} objects, {_data.Events.Count} events{(_data.Truncated ? " (recording was cut short)" : "")}");
         }
@@ -193,15 +208,8 @@ namespace Streplay
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
             _returningToMenu = true;
+            _returningSince = Time.unscaledTime;
             SceneManager.LoadScene("MainMenu");
-        }
-
-        // Straight from one replay to another (reviewing highlights on different maps) without the main menu in between.
-        public void SwitchTo(ReplayMeta meta, float startAt, float? inPoint = null, float? outPoint = null)
-        {
-            if (!Active) { Open(meta, startAt, inPoint, outPoint); return; }
-            Teardown();
-            StartCoroutine(OpenRoutine(meta, startAt, inPoint, outPoint));
         }
 
         // everything the replay created or changed in the map, leaving the menu's hidden UI as it is
@@ -240,7 +248,7 @@ namespace Streplay
                 c.enabled = false;
                 if (_hiddenUi.Contains(c)) continue; // the game keeps switching it on: hide it quietly
                 _hiddenUi.Add(c);
-                Plugin.Log.LogInfo($"[ui] hid canvas '{c.name}' that came up during the replay");
+                Plugin.Log.LogDebug($"[ui] hid canvas '{c.name}' that came up during the replay");
             }
         }
 
@@ -343,13 +351,13 @@ namespace Streplay
                 made++;
             }
             if (missing > 0) Plugin.Log.LogWarning($"{missing} recorded objects have no matching prefab/scene object and will be skipped");
-            Plugin.Log.LogInfo($"Created {made} replay objects");
+            Plugin.Log.LogDebug($"Created {made} replay objects");
 
             // See what a player sees: the map's spectator camera may cull layers the player camera renders.
             var setup = _puppets.Where(p => p != null && p.Info.IsPlayer).Select(p => p.Go.GetComponent<PlayerSetup>()).FirstOrDefault(s => s != null);
             if (setup != null && F_HighMask?.GetValue(setup) is LayerMask mask && mask.value != 0)
             {
-                Plugin.Log.LogInfo($"Camera mask {_cam.cullingMask:X8} -> player mask {mask.value:X8}");
+                Plugin.Log.LogDebug($"Camera mask {_cam.cullingMask:X8} -> player mask {mask.value:X8}");
                 _cam.cullingMask = mask.value;
                 _maskWorld = mask.value;
                 // low-quality mode renders everything with one camera, so its mask includes the viewmodel layers
@@ -364,18 +372,18 @@ namespace Streplay
         void LogPostProcess()
         {
             var ppl = _cam.GetComponent<UnityEngine.Rendering.PostProcessing.PostProcessLayer>();
-            Plugin.Log.LogInfo($"[pp] replay cam layer={(ppl != null ? $"yes enabled={ppl.enabled} mask={ppl.volumeLayer.value:X8} trigger={(ppl.volumeTrigger != null ? ppl.volumeTrigger.name : "null")}" : "none")}");
+            Plugin.Log.LogDebug($"[pp] replay cam layer={(ppl != null ? $"yes enabled={ppl.enabled} mask={ppl.volumeLayer.value:X8} trigger={(ppl.volumeTrigger != null ? ppl.volumeTrigger.name : "null")}" : "none")}");
             foreach (var v in Resources.FindObjectsOfTypeAll<UnityEngine.Rendering.PostProcessing.PostProcessVolume>())
             {
                 if (v == null || !v.gameObject.scene.IsValid()) continue;
-                Plugin.Log.LogInfo($"[pp] volume {Recorder.ScenePath(v.transform)} enabled={v.enabled} active={v.gameObject.activeInHierarchy} global={v.isGlobal} layer={v.gameObject.layer} prio={v.priority} weight={v.weight} profile={(v.sharedProfile != null ? v.sharedProfile.name : "null")}");
+                Plugin.Log.LogDebug($"[pp] volume {Recorder.ScenePath(v.transform)} enabled={v.enabled} active={v.gameObject.activeInHierarchy} global={v.isGlobal} layer={v.gameObject.layer} prio={v.priority} weight={v.weight} profile={(v.sharedProfile != null ? v.sharedProfile.name : "null")}");
             }
             var local = _puppets.FirstOrDefault(p => p != null && p.IsLocalPlayer);
             var fpc = local?.Go.GetComponent<FirstPersonController>();
             if (fpc != null && fpc.playerCamera != null)
             {
                 var l = fpc.playerCamera.GetComponent<UnityEngine.Rendering.PostProcessing.PostProcessLayer>();
-                Plugin.Log.LogInfo($"[pp] player cam layer={(l != null ? $"yes mask={l.volumeLayer.value:X8} aa={l.antialiasingMode}" : "none")}");
+                Plugin.Log.LogDebug($"[pp] player cam layer={(l != null ? $"yes mask={l.volumeLayer.value:X8} aa={l.antialiasingMode}" : "none")}");
             }
         }
 
@@ -405,7 +413,7 @@ namespace Streplay
                 go.transform.localPosition = Vector3.zero;
                 go.transform.localRotation = Quaternion.identity;
                 _vmCams.Add(c);
-                Plugin.Log.LogInfo($"Viewmodel camera {i}: fov={c.fieldOfView} mask={c.cullingMask:X8} near={c.nearClipPlane}");
+                Plugin.Log.LogDebug($"Viewmodel camera {i}: fov={c.fieldOfView} mask={c.cullingMask:X8} near={c.nearClipPlane}");
             }
             if (_vmCams.Count > 0) _maskFirstPerson = _maskWorld; // overlays draw the viewmodel layers
         }
@@ -452,7 +460,7 @@ namespace Streplay
                 int on = rs.Count(r => r.enabled && r.gameObject.activeInHierarchy);
                 int culled = rs.Count(r => (_cam.cullingMask & (1 << r.gameObject.layer)) == 0);
                 var layers = string.Join(",", rs.Select(r => r.gameObject.layer).Distinct());
-                Plugin.Log.LogInfo($"[diag] {g.Key} x{g.Count()} owned={p.Owned} active={p.Go.activeInHierarchy} pos={p.Go.transform.position} " +
+                Plugin.Log.LogDebug($"[diag] {g.Key} x{g.Count()} owned={p.Owned} active={p.Go.activeInHierarchy} pos={p.Go.transform.position} " +
                                    $"scale={p.Go.transform.lossyScale} renderers={on}/{rs.Length} culledByCam={culled} layers={layers}");
             }
         }
@@ -610,7 +618,7 @@ namespace Streplay
                 }
                 foreach (var a in go.GetComponentsInChildren<AudioSource>(true)) a.Stop();
             }
-            if (ReplayAudio.LogEach) Plugin.Log.LogInfo($"[restore] t={t:0.00} re-fired {add.Count} effects ({string.Join(", ", add.Select(i => evs[i].Method).Distinct())}), {_restored.Count} kept, {sw.ElapsedMilliseconds} ms");
+            if (ReplayAudio.LogEach) Plugin.Log.LogDebug($"[restore] t={t:0.00} re-fired {add.Count} effects ({string.Join(", ", add.Select(i => evs[i].Method).Distinct())}), {_restored.Count} kept, {sw.ElapsedMilliseconds} ms");
         }
 
         int FrameAt(float t)

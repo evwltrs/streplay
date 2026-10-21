@@ -253,7 +253,7 @@ namespace Streplay
                         Directory.CreateDirectory(job.Root);
                         string wavCopy = Path.Combine(job.Root, job.Name + ".wav");
                         File.Copy(AudioCachePath, wavCopy, true);
-                        Plugin.Log.LogInfo("[render] reusing the sound recorded for this range");
+                        Plugin.Log.LogDebug("[render] reusing the sound recorded for this range");
                         BeginVideo(job, wavCopy);
                         return;
                     }
@@ -267,7 +267,7 @@ namespace Streplay
                 };
                 Seek(start);
                 _playing = false;
-                Plugin.Log.LogInfo($"[render] recording the sound of {Fmt(start)}-{Fmt(stop)} in real time first");
+                Plugin.Log.LogDebug($"[render] recording the sound of {Fmt(start)}-{Fmt(stop)} in real time first");
                 return;
             }
             BeginVideo(job, null);
@@ -315,7 +315,7 @@ namespace Streplay
                     }, p.Gain);
                 }
                 else p.Tap.WriteWav(wav, p.Need);
-                Plugin.Log.LogInfo($"[render] sound: {p.Need} samples x {p.Tap.Channels} ch @ {p.Tap.SampleRate} Hz -> {wav}");
+                Plugin.Log.LogDebug($"[render] sound: {p.Need} samples x {p.Tap.Channels} ch @ {p.Tap.SampleRate} Hz -> {wav}");
                 try { File.Copy(wav, AudioCachePath, true); _audioCacheKey = AudioKey(p.Job); } catch { _audioCacheKey = null; }
             }
             catch (Exception e)
@@ -406,7 +406,7 @@ namespace Streplay
             string blur = job.Sub <= 1 ? "no motion blur"
                 : job.SubN != null ? $"motion blur {job.SubN.Min()}-{job.SubN.Max()} sub-frames (adaptive, {job.SubTotal} in all), {job.Shutter * 360f:0}° shutter, {job.Weighting} weighting"
                 : $"motion blur {job.Sub} sub-frames, {job.Shutter * 360f:0}° shutter, {job.Weighting} weighting";
-            Plugin.Log.LogInfo($"[render] {Fmt(job.Start)}-{Fmt(job.End)} at {job.Speed:0.##}x: {job.Frames} frames {job.W}x{job.H} @ {job.Fps}fps, " + blur +
+            Plugin.Log.LogDebug($"[render] {Fmt(job.Start)}-{Fmt(job.End)} at {job.Speed:0.##}x: {job.Frames} frames {job.W}x{job.H} @ {job.Fps}fps, " + blur +
                                (job.Ramp != null ? $", slow-mo {job.Ramp.Speed:0.##}x at {job.Ramp.At.Count} kill(s)" : "") +
                                $", {job.Format} -> {job.Sink.OutputPath} (color space {QualitySettings.activeColorSpace}, MSAA {_camRT.antiAliasing}, window {Screen.width}x{Screen.height}, far clip {_cam.farClipPlane})");
         }
@@ -420,8 +420,8 @@ namespace Streplay
                 var beh = UnityEngine.Object.FindObjectsOfType<MonoBehaviour>().Where(b => b.isActiveAndEnabled)
                     .GroupBy(b => b.GetType().Assembly.GetName().Name).OrderByDescending(g => g.Count())
                     .Select(g => $"{g.Key} {g.Count()} ({string.Join(", ", g.GroupBy(b => b.GetType().Name).OrderByDescending(t => t.Count()).Take(6).Select(t => $"{t.Key} x{t.Count()}"))})");
-                Plugin.Log.LogInfo($"[render] cameras: {string.Join("; ", cams)}");
-                Plugin.Log.LogInfo($"[render] enabled behaviours: {string.Join(" | ", beh)}");
+                Plugin.Log.LogDebug($"[render] cameras: {string.Join("; ", cams)}");
+                Plugin.Log.LogDebug($"[render] enabled behaviours: {string.Join(" | ", beh)}");
             }
             catch (Exception e) { Plugin.Log.LogWarning($"[render] frame cost probe failed: {e.Message}"); }
         }
@@ -721,7 +721,7 @@ namespace Streplay
                 double f = System.Diagnostics.Stopwatch.Frequency, n = j.SubDone - 1;
                 double ms(long t) => t / f * 1000.0 / n;
                 double wall = (j.TWall1 - j.TWall0) / f;
-                Plugin.Log.LogInfo($"[render] speed: {n:0} sub-frames in {wall:0.0}s = {n / wall:0} per second; per sub-frame {wall * 1000.0 / n:0.00} ms: " +
+                Plugin.Log.LogDebug($"[render] speed: {n:0} sub-frames in {wall:0.0}s = {n / wall:0} per second; per sub-frame {wall * 1000.0 / n:0.00} ms: " +
                                    $"replay update {ms(j.TUpdate):0.00}, late update/HUD {ms(j.TLate):0.00}, our UI {ms(j.TGui):0.00}, capture {ms(j.TCapture):0.00} ms, " +
                                    $"rest (engine, GPU, game scripts) {wall * 1000.0 / n - ms(j.TUpdate) - ms(j.TLate) - ms(j.TGui) - ms(j.TCapture):0.00} ms " +
                                    $"(vsync was {j.SavedVSync}, frame cap was {j.SavedTargetFps}); {j.ManualCount} drawn by hand" +
@@ -905,9 +905,9 @@ namespace Streplay
             int shSel = Array.FindIndex(shutters, s => Mathf.Approximately(s, Plugin.RenderShutter.Value));
             int nsh = Ui.Segmented(new Rect(cx, y, 300f, rh), new[] { "90°", "180°", "270°", "360°" }, shSel);
             if (nsh != shSel) { Plugin.RenderShutter.Value = shutters[nsh]; _shutterText = null; }
-            _shutterText ??= Plugin.RenderShutter.Value.ToString("0");
+            _shutterText ??= Plugin.RenderShutter.Value.ToString("0", System.Globalization.CultureInfo.InvariantCulture);
             string st = Ui.Field(new Rect(cx + 312f, y, 56f, rh), _shutterText, 3);
-            if (st != _shutterText) { _shutterText = st; if (float.TryParse(st, out float sv) && sv >= 1 && sv <= 360) Plugin.RenderShutter.Value = sv; }
+            if (st != _shutterText) { _shutterText = st; if (float.TryParse(st.Replace(',', '.'), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float sv) && sv >= 1 && sv <= 360) Plugin.RenderShutter.Value = sv; }
             y += rh + gap;
 
             Label("Blur look");

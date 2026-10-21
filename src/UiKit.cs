@@ -50,6 +50,9 @@ namespace Streplay
             var skin = GUI.skin;
             _oldField = skin.textField;
             skin.textField = _field;
+            // shared with every other IMGUI mod: changed only while we draw, put back in End
+            _oldCursor = skin.settings.cursorColor;
+            _oldSelection = skin.settings.selectionColor;
             skin.settings.cursorColor = Accent;
             skin.settings.selectionColor = new Color(1f, 0.17f, 0.84f, 0.35f);
         }
@@ -58,7 +61,22 @@ namespace Streplay
         {
             if (_tip != null) DrawTip();
             GUI.skin.textField = _oldField;
+            GUI.skin.settings.cursorColor = _oldCursor;
+            GUI.skin.settings.selectionColor = _oldSelection;
             GUI.matrix = _oldMatrix;
+        }
+
+        static Color _oldCursor, _oldSelection;
+
+        // Explorer handles any folder name (OpenURL with file:/// breaks on # or %)
+        public static void OpenFolder(string path)
+        {
+            try
+            {
+                System.IO.Directory.CreateDirectory(path);
+                System.Diagnostics.Process.Start("explorer.exe", "\"" + path + "\"");
+            }
+            catch (System.Exception e) { Plugin.Log.LogWarning($"Could not open {path}: {e.Message}"); }
         }
 
         // STRAFTAT's own HUD font (Century Gothic Bold Italic) when the game ships it, else Bahnschrift slanted
@@ -72,7 +90,7 @@ namespace Streplay
                     { _font = tmp.sourceFontFile; break; }
             _gameFont = _font != null;
             if (_font == null) _font = Font.CreateDynamicFontFromOSFont(new[] { "Bahnschrift", "Segoe UI", "Arial" }, 14);
-            Plugin.Log.LogInfo($"[ui] font: {_font.name}{(_gameFont ? " (the game's)" : "")}");
+            Plugin.Log.LogDebug($"[ui] font: {_font.name}{(_gameFont ? " (the game's)" : "")}");
             _field = new GUIStyle { font = _font, fontSize = 13, padding = new RectOffset(10, 10, 4, 4), alignment = TextAnchor.MiddleLeft, clipping = TextClipping.Clip, fontStyle = _gameFont ? FontStyle.Normal : FontStyle.Italic };
             _field.normal.textColor = TextC;
             _field.focused.textColor = Color.white;

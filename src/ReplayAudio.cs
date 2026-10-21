@@ -47,7 +47,7 @@ namespace Streplay
             foreach (var p in puppets)
                 if (p?.Go != null && p.Owned) _puppetSources.AddRange(p.Go.GetComponentsInChildren<AudioSource>(true));
             PlayedStandalone = PlayedForRpc = LoopsStarted = 0;
-            Plugin.Log.LogInfo($"Replay audio: {data.Sounds.Count} sounds ({data.Sounds.Count(s => s.Rpc != null)} tied to effect RPCs), {data.AudioSources.Count} tracked sources");
+            Plugin.Log.LogDebug($"Replay audio: {data.Sounds.Count} sounds ({data.Sounds.Count(s => s.Rpc != null)} tied to effect RPCs), {data.AudioSources.Count} tracked sources");
         }
 
         public void Dispose()
@@ -103,7 +103,7 @@ namespace Streplay
                     var anchor = ResolveAnchor(s.Obj, s.Path, s.Flags);
                     if (anchor != null && IsEffectObject(anchor.root.gameObject))
                     {
-                        if (LogEach) Plugin.Log.LogInfo($"[sound] t={s.T:0.00} clip={s.Clip} left to the replayed {anchor.root.name}");
+                        if (LogEach) Plugin.Log.LogDebug($"[sound] t={s.T:0.00} clip={s.Clip} left to the replayed {anchor.root.name}");
                         continue;
                     }
                 }
@@ -177,7 +177,7 @@ namespace Streplay
             try { target.PlayOneShot(clip, s.VolumeScale); }
             finally { AudioCapture.OwnPlay = false; }
             if (LogEach)
-                Plugin.Log.LogInfo($"[sound] t={s.T:0.00} clip={s.Clip} via={(target == orig ? "source" : "standin")} anchor={(s.Obj >= 0 ? _data.Objects[s.Obj].Name + "/" + s.Path : s.Path)} 2d={s.SpatialBlend < 0.01f} rpc={s.Rpc?.Method ?? "-"}");
+                Plugin.Log.LogDebug($"[sound] t={s.T:0.00} clip={s.Clip} via={(target == orig ? "source" : "standin")} anchor={(s.Obj >= 0 ? _data.Objects[s.Obj].Name + "/" + s.Path : s.Path)} 2d={s.SpatialBlend < 0.01f} rpc={s.Rpc?.Method ?? "-"}");
             return true;
         }
 
@@ -313,7 +313,7 @@ namespace Streplay
                 ls.StartT = st.StartT;
                 LoopsStarted++;
                 if (LogEach)
-                    Plugin.Log.LogInfo($"[sound] t={t:0.00} loop={st.Clip} at {off:0.00}s vol={st.Volume:0.00} anchor={_data.Objects[info.Obj].Name}/{info.Path}");
+                    Plugin.Log.LogDebug($"[sound] t={t:0.00} loop={st.Clip} at {off:0.00}s vol={st.Volume:0.00} anchor={_data.Objects[info.Obj].Name}/{info.Path}");
             }
         }
 
