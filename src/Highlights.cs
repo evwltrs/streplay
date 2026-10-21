@@ -452,7 +452,10 @@ namespace Streplay
         public static void Scan(List<ReplayMeta> metas)
         {
             if (Scanning) return;
-            var todo = metas.Where(m => m.Finished && m.HighlightsVersion < Version).ToList();
+            // unfinished rounds too (the game closed or crashed mid-round), except the one being recorded right now
+            string recording = Recorder.Instance != null ? Recorder.Instance.CurrentMetaPath : null;
+            var todo = metas.Where(m => m.HighlightsVersion < Version
+                                        && (m.Finished || !string.Equals(m.MetaPath, recording, StringComparison.OrdinalIgnoreCase))).ToList();
             if (todo.Count == 0) return;
             // every recording's weapon zoom first, so no-scopes are judged the same whatever the order
             foreach (var m in metas) MergeZoom(m.WeaponZoom);
@@ -466,24 +469,38 @@ namespace Streplay
                 {
                     try
                     {
+                        // Work on a copy read from disk: the menu and the replay player use `m` on the main thread
+                        // (markers get added, lists enumerated). Only the finished highlight list is handed back.
+                        var work = ReplayMeta.Load(m.MetaPath);
+                        if (work == null) { m.HighlightsVersion = Version; _done++; continue; }
                         // measured before (current measurements): only the scoring changed, no need to read the recording
-                        bool measured = m.FeaturesVersion == FeaturesVersion && m.KillRecs != null;
-                        if (!measured) { Measure(ReplayIO.Read(m.ReplayPath), m); reread++; }
-                        var found = Score(m);
-                        // reload before saving so a marker added meanwhile isn't overwritten
-                        var fresh = ReplayMeta.Load(m.MetaPath) ?? m;
-                        fresh.Markers = fresh.Markers ?? m.Markers;
-                        m.Markers = fresh.Markers;
-                        found = Score(m); // with the freshest flags
-                        fresh.Highlights = found;
-                        fresh.HighlightsVersion = Version;
-                        fresh.KillRecs = m.KillRecs;
-                        fresh.TakeWins = m.TakeWins;
-                        fresh.WeaponZoom = m.WeaponZoom;
-                        fresh.FeaturesVersion = m.FeaturesVersion;
-                        fresh.Save();
+                        bool measured = work.FeaturesVersion == FeaturesVersion && work.KillRecs != null;
+                        if (!measured || !work.Finished)
+                        {
+                            var data = ReplayIO.Read(work.ReplayPath);
+                            if (!measured) { Measure(data, work); reread++; }
+                            if (!work.Finished)
+                            {
+                                // a round the game didn't get to close: what was recorded still plays
+                                work.Duration = data.Duration;
+                                work.Finished = true;
+                            }
+                        }
+                        var found = Score(work);
+                        ReplayMeta.UpdateFile(m.MetaPath, f =>
+                        {
+                            f.Highlights = found;
+                            f.HighlightsVersion = Version;
+                            f.KillRecs = work.KillRecs;
+                            f.TakeWins = work.TakeWins;
+                            f.WeaponZoom = work.WeaponZoom;
+                            f.FeaturesVersion = work.FeaturesVersion;
+                            if (!f.Finished) { f.Duration = work.Duration; f.Finished = true; }
+                        });
+                        // reference swaps only: readers on the main thread see the old list or the new one
                         m.Highlights = found;
                         m.HighlightsVersion = Version;
+                        if (!m.Finished) { m.Duration = work.Duration; m.Finished = true; }
                     }
                     catch (ThreadAbortException) { throw; } // the game closing: this one gets scanned next time
                     catch (Exception e)

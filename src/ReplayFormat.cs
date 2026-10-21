@@ -532,6 +532,12 @@ namespace Streplay
                 // Recording was interrupted (game closed or crashed mid-round); keep what we have.
                 data.Truncated = true;
             }
+            catch (Exception e)
+            {
+                // A damaged record (a write that failed half way, a full disk): everything before it is still good.
+                data.Truncated = true;
+                Plugin.Log.LogWarning($"{Path.GetFileName(path)} is damaged after {data.Frames.Count} frames ({e.Message}); playing what was recorded before that");
+            }
 
             if (data.Frames.Count > 0 && (data.Truncated || data.Duration <= 0f))
                 data.Duration = data.Frames[data.Frames.Count - 1].T;

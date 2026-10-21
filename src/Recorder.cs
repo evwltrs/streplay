@@ -18,6 +18,7 @@ namespace Streplay
         public static Recorder Instance;
         public bool IsRecording => _w != null;
         public float CurrentTime => Time.unscaledTime - _startTime;
+        internal string CurrentMetaPath => IsRecording ? _meta?.MetaPath : null;
 
         BinaryWriter _w;
         ReplayMeta _meta;
@@ -115,7 +116,8 @@ namespace Streplay
                 Stop();
             }
             else if (IsRecording && take != _take) _take = take; // the take index synced in after the file started
-            if (!IsRecording && want) Begin(scene);
+            if (scene != _failedScene) _failedScene = null;
+            if (!IsRecording && want && (_failedScene == null || Time.unscaledTime >= _retryAt)) Begin(scene);
 
             // works between takes too (loading screen), as long as a kill was just made
             if (Plugin.MarkerKey.Value.IsDown() && !ReplayPlayer.Active && !FlagRecentKill() && IsRecording)
@@ -169,9 +171,27 @@ namespace Streplay
             }
             catch (Exception e)
             {
-                Plugin.Log.LogError($"Recording failed, stopping this round: {e}");
+                // the frame record may be half written: close the file without an end record (the reader keeps
+                // everything up to the last complete record) and don't restart on this map straight away
+                _torn = true;
+                ReportFailure("Recording failed, stopping this round", e);
                 Stop();
+                _failedScene = _scene;
+                _retryAt = Time.unscaledTime + 30f;
             }
+        }
+
+        // Recording problems (a full disk, an unwritable folder) would otherwise repeat every round: the full error
+        // once per session, then a short line.
+        bool _failureLogged;
+        string _failedScene;
+        float _retryAt;
+        bool _torn;
+
+        void ReportFailure(string what, Exception e)
+        {
+            if (!_failureLogged) { _failureLogged = true; Plugin.Log.LogError($"{what}: {e}"); }
+            else Plugin.Log.LogWarning($"{what}: {e.Message}");
         }
 
         void OnApplicationQuit() => Stop();
@@ -185,12 +205,18 @@ namespace Streplay
 
         void Begin(string scene)
         {
+            string path = null;
+            _torn = false;
             try
             {
                 Directory.CreateDirectory(Plugin.ReplayFolder.Value);
                 var start = DateTime.UtcNow;
-                string baseName = $"{start.ToLocalTime():yyyy-MM-dd_HH-mm-ss}_{Sanitize(scene)}";
-                string path = Path.Combine(Plugin.ReplayFolder.Value, baseName + ".strp");
+                string baseName = start.ToLocalTime().ToString("yyyy-MM-dd_HH-mm-ss", System.Globalization.CultureInfo.InvariantCulture) + "_" + Sanitize(scene);
+                path = Path.Combine(Plugin.ReplayFolder.Value, baseName + ".strp");
+                // two recordings can start in the same second (a short take right after another): never overwrite
+                for (int n = 2; File.Exists(path) || File.Exists(path + ".json"); n++)
+                    path = Path.Combine(Plugin.ReplayFolder.Value, $"{baseName}_{n}.strp");
+                baseName = Path.GetFileNameWithoutExtension(path);
 
                 var header = new ReplayHeader
                 {
@@ -228,8 +254,12 @@ namespace Streplay
             }
             catch (Exception e)
             {
-                Plugin.Log.LogError($"Could not start recording: {e}");
+                ReportFailure("Could not start recording", e);
+                try { _w?.Dispose(); } catch { /* already broken */ }
                 _w = null;
+                try { if (path != null && File.Exists(path) && !File.Exists(path + ".json")) File.Delete(path); } catch { /* best effort */ }
+                _failedScene = scene;
+                _retryAt = Time.unscaledTime + 30f;
             }
         }
 
@@ -241,13 +271,20 @@ namespace Streplay
             float duration = Time.unscaledTime - _startTime;
             try
             {
-                w.Write(Rec.End);
-                w.Write(duration);
-                w.Dispose();
+                if (!_torn)
+                {
+                    w.Write(Rec.End);
+                    w.Write(duration);
+                }
             }
             catch (Exception e)
             {
-                Plugin.Log.LogError($"Error closing replay: {e.Message}");
+                Plugin.Log.LogWarning($"Error closing replay: {e.Message}");
+            }
+            finally
+            {
+                try { w.Dispose(); } catch (Exception e) { Plugin.Log.LogWarning($"Error closing replay file: {e.Message}"); }
+                _torn = false;
             }
             if (duration < 3f && _meta.Markers.Count == 0 && _lastKill?.Meta != _meta)
             {

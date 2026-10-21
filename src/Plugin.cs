@@ -188,13 +188,14 @@ namespace Streplay
             DumpKey = Config.Bind("Debug", "DumpKey", new KeyboardShortcut(KeyCode.F11),
                 "Write a diagnostic dump (the scene and every networked object) to the replay folder, to attach to bug reports.");
 
-            Directory.CreateDirectory(ReplayFolder.Value);
+            EnsureReplayFolder();
 
+            // Each patch group on its own: a game update that breaks one only loses that feature, not the plugin.
             var harmony = new Harmony(Guid);
-            RpcCapture.Install(harmony);
-            AudioCapture.Install(harmony);
-            harmony.PatchAll(typeof(GameSuspend));
-            harmony.PatchAll(typeof(KillHook));
+            TryPatch("effect capture", () => RpcCapture.Install(harmony));
+            TryPatch("sound capture", () => AudioCapture.Install(harmony));
+            TryPatch("pause menu suspension", () => harmony.PatchAll(typeof(GameSuspend)));
+            TryPatch("kill detection", () => harmony.PatchAll(typeof(KillHook)));
 
             // Own host object so we survive any scene changes regardless of what happens to BepInEx's manager.
             Host = new GameObject("Streplay");
@@ -209,6 +210,34 @@ namespace Streplay
 #endif
 
             Log.LogInfo($"{Name} {Version} loaded. Replays: {ReplayFolder.Value}");
+        }
+
+        static void TryPatch(string what, Action patch)
+        {
+            try { patch(); }
+            catch (Exception e) { Log.LogError($"Could not hook {what} (a game update?); that part of Streplay is off: {e.Message}"); }
+        }
+
+        // The configured folder (quotes trimmed) if it can be created; otherwise %LOCALAPPDATA%\Streplay, so a bad path,
+        // an offline OneDrive or a blocked Documents folder doesn't stop recording altogether.
+        static void EnsureReplayFolder()
+        {
+            string wanted = (ReplayFolder.Value ?? "").Trim().Trim('"');
+            try
+            {
+                if (wanted.Length == 0) throw new ArgumentException("empty path");
+                wanted = Path.GetFullPath(wanted);
+                Directory.CreateDirectory(wanted);
+                if (wanted != ReplayFolder.Value) ReplayFolder.Value = wanted;
+                return;
+            }
+            catch (Exception e)
+            {
+                string fallback = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Streplay");
+                Log.LogError($"Can't use the replay folder '{wanted}' ({e.Message}). Using {fallback} instead; change General.ReplayFolder to fix it.");
+                try { Directory.CreateDirectory(fallback); ReplayFolder.Value = fallback; }
+                catch (Exception e2) { Log.LogError($"Can't create {fallback} either: {e2.Message}. Recording will fail."); }
+            }
         }
 
         internal static bool ContainsAny(string s, string csv)

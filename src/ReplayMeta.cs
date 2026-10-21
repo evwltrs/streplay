@@ -60,12 +60,45 @@ namespace Streplay
             public string Detail = "";
         }
 
+        // One writer at a time (the highlight scan saves from a background thread), and the old file is only replaced
+        // once the new one is fully written, so a crash or a locked file can't leave a replay without its .json.
+        static readonly object SaveLock = new object();
+
         public void Save()
         {
-            var tmp = MetaPath + ".tmp";
-            File.WriteAllText(tmp, JsonConvert.SerializeObject(this, Formatting.Indented));
-            if (File.Exists(MetaPath)) File.Delete(MetaPath);
-            File.Move(tmp, MetaPath);
+            lock (SaveLock)
+            {
+                string json = JsonConvert.SerializeObject(this, Formatting.Indented);
+                string tmp = MetaPath + "." + Guid.NewGuid().ToString("N").Substring(0, 8) + ".tmp";
+                File.WriteAllText(tmp, json);
+                try
+                {
+                    if (!File.Exists(MetaPath)) File.Move(tmp, MetaPath);
+                    else
+                    {
+                        try { File.Replace(tmp, MetaPath, null); }
+                        catch (PlatformNotSupportedException) { File.Delete(MetaPath); File.Move(tmp, MetaPath); }
+                    }
+                }
+                catch
+                {
+                    try { File.Delete(tmp); } catch { /* best effort */ }
+                    throw;
+                }
+            }
+        }
+
+        // Read the file, change it and write it back as one step (no other save in between), so a background
+        // update can't undo a marker the player just added.
+        public static void UpdateFile(string metaPath, Action<ReplayMeta> change)
+        {
+            lock (SaveLock)
+            {
+                var m = Load(metaPath);
+                if (m == null) return;
+                change(m);
+                m.Save();
+            }
         }
 
         public static ReplayMeta Load(string metaPath)
