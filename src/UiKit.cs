@@ -152,50 +152,58 @@ namespace Streplay
             GUI.DrawTexture(r, Texture2D.whiteTexture, ScaleMode.StretchToFill, true, 0f, c, width, radius);
         }
 
-        // a block leaning like italic type, drawn as two anti-aliased edge wedges and a plain middle, so it lines up
-        // exactly wherever it's drawn (inside groups too) and keeps the same lean at any size
+        // A block leaning like italic type. It's one 9-slice draw (slanted ends as fixed borders, a stretched middle):
+        // separate pieces get their edges rounded to pixels one by one on scaled screens, which opens a 1px hole between
+        // them, while a sliced draw is a single mesh whose slices share their edges. Same lean at any size.
         public static void Slant(Rect r, Color c, float lean = SlantTan)
         {
             if (Event.current.type != EventType.Repaint || c.a <= 0f) return;
-            EnsureWedges();
-            float w = Mathf.Min(r.height * lean, r.width * 0.5f);
-            if (w < 0.5f) { GUI.DrawTexture(r, Texture2D.whiteTexture, ScaleMode.StretchToFill, true, 0f, c, 0f, 0f); return; }
-            // All three pieces go through the plain textured path: the rounded-rect overload of DrawTexture softens every
-            // edge, so on scaled screens (joins between pixels) two half-covered edges let a dark seam through. Plain quads
-            // share the join exactly and each pixel is drawn once, solid or see-through.
-            var keep = GUI.color;
-            GUI.color = keep * c; // keeps any fade the caller set
-            var all = new Rect(0f, 0f, 1f, 1f);
-            GUI.DrawTextureWithTexCoords(new Rect(r.x, r.y, w, r.height), _wedgeL, all, true);
-            if (r.width > w * 2f) GUI.DrawTextureWithTexCoords(new Rect(r.x + w, r.y, r.width - w * 2f, r.height), Texture2D.whiteTexture, all, true);
-            GUI.DrawTextureWithTexCoords(new Rect(r.xMax - w, r.y, w, r.height), _wedgeR, all, true);
-            GUI.color = keep;
+            // narrow ones (ticks, pins) get shorter ends so there's always a middle column
+            int b = Mathf.Min(Mathf.RoundToInt(r.height * lean), Mathf.FloorToInt((r.width - 1f) / 2f));
+            if (b < 1)
+            {
+                var keep = GUI.color;
+                GUI.color = keep * c;
+                GUI.DrawTexture(r, Texture2D.whiteTexture);
+                GUI.color = keep;
+                return;
+            }
+            var keepBg = GUI.backgroundColor;
+            GUI.backgroundColor = c; // style backgrounds are tinted by backgroundColor * color, so a caller's fade still applies
+            SlantStyle(b, lean).Draw(r, GUIContent.none, false, false, false, false);
+            GUI.backgroundColor = keepBg;
         }
 
-        static Texture2D _wedgeL, _wedgeR;
+        static readonly Dictionary<int, GUIStyle> _slantStyles = new Dictionary<int, GUIStyle>();
 
-        // the slanted ends: left = lower-right triangle, right = upper-left triangle (texture y points up)
-        static void EnsureWedges()
+        // White parallelogram texture for one end width: b-texel slanted ends either side of a solid middle; the style's
+        // borders keep the ends b units wide and stretch the middle. The middle is wide and the texture tall (4 rows per
+        // unit) because the stretched middle blends with the ends' half-covered corner texels at its edges: kept to a
+        // sliver of a pixel that way instead of smearing a shadow across the block.
+        static GUIStyle SlantStyle(int b, float lean)
         {
-            if (_wedgeL != null) return;
-            _wedgeL = Wedge((u, v) => u >= v);
-            _wedgeR = Wedge((u, v) => u <= v);
-        }
-
-        static Texture2D Wedge(System.Func<float, float, bool> inside)
-        {
-            const int n = 64;
-            var t = new Texture2D(n, n, TextureFormat.RGBA32, false) { hideFlags = HideFlags.HideAndDontSave, filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp };
-            for (int py = 0; py < n; py++)
-                for (int px = 0; px < n; px++)
+            int key = b * 1000 + Mathf.RoundToInt(lean * 1000f);
+            if (_slantStyles.TryGetValue(key, out var st) && st.normal.background != null) return st;
+            const int mid = 64;
+            int tw = b * 2 + mid, th = Mathf.Max(4, Mathf.RoundToInt(b / lean * 4f));
+            var t = new Texture2D(tw, th, TextureFormat.RGBA32, false) { hideFlags = HideFlags.HideAndDontSave, filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp };
+            for (int py = 0; py < th; py++)
+                for (int px = 0; px < tw; px++)
                 {
                     int hits = 0;
                     for (int k = 0; k < 16; k++)
-                        if (inside((px + (k % 4 + 0.5f) / 4f) / n, (py + (k / 4 + 0.5f) / 4f) / n)) hits++;
+                    {
+                        float x = px + (k % 4 + 0.5f) / 4f, y = py + (k / 4 + 0.5f) / 4f; // texel space, y up
+                        float edge = y / th * b; // the lean's x offset at this height
+                        if (x >= edge && x <= tw - b + edge) hits++;
+                    }
                     t.SetPixel(px, py, new Color(1f, 1f, 1f, hits / 16f));
                 }
             t.Apply();
-            return t;
+            st = new GUIStyle { border = new RectOffset(b, b, 0, 0) };
+            st.normal.background = t;
+            _slantStyles[key] = st;
+            return st;
         }
 
         public static void Circle(Vector2 centre, float radius, Color c) => Fill(new Rect(centre.x - radius, centre.y - radius, radius * 2f, radius * 2f), c, radius);
