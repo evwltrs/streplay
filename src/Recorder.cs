@@ -129,6 +129,8 @@ namespace Streplay
 
         static int CurrentTake => ScoreManager.Instance != null ? ScoreManager.Instance.TakeIndex : -1;
 
+        int _killFrame = -1;
+
         internal void OnLocalDeath()
         {
             if (IsRecording && Plugin.AutoMarkDeaths.Value) AddMarker("Died", auto: true);
@@ -137,7 +139,8 @@ namespace Streplay
         // Called (observe-only) when the game counts a kill for the local player, which every weapon does.
         internal void OnLocalKill()
         {
-            if (!IsRecording) return;
+            if (!IsRecording || Time.frameCount == _killFrame) return; // a weapon's kill path and the kill counter, same kill
+            _killFrame = Time.frameCount;
             float t = CurrentTime;
             var marker = Plugin.AutoMarkKills.Value ? AddMarker("Kill", auto: true) : null;
             _lastKill = new KillMark { Meta = _meta, Marker = marker ?? new ReplayMeta.MetaMarker { T = t, Label = "Kill", Auto = true }, At = Time.unscaledTime };
@@ -212,6 +215,7 @@ namespace Streplay
         {
             string path = null;
             _torn = false;
+            _lastMarkerTime = -10f; // recording time starts over each round
             try
             {
                 Directory.CreateDirectory(Plugin.ReplayFolder.Value);
@@ -805,6 +809,11 @@ namespace Streplay
                     _lastKill.Marker.Label = $"Kill: {victim}";
                     try { _meta.Save(); } catch (Exception e) { Plugin.Log.LogWarning($"Marker metadata save failed: {e.Message}"); }
                 }
+            }
+            // every death, exploded or not, plays out through this RPC on the dead player's client too
+            else if (method == "ExplodeForAll" && inst is PlayerHealth && nob.IsOwner)
+            {
+                OnLocalDeath();
             }
         }
 
