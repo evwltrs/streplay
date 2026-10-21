@@ -1,4 +1,5 @@
-# Draws thunderstore/icon.png (256x256, as Thunderstore requires). Run: powershell -File tools\make-icon.ps1
+# Draws a 256x256 Thunderstore icon. Run: powershell -File tools\make-icon.ps1 [-Label STREPLAY] [-Out thunderstore\icon.png]
+param([string]$Label = 'STREPLAY', [string]$Out = (Join-Path $PSScriptRoot '..\thunderstore\icon.png'))
 Add-Type -AssemblyName System.Drawing
 $size = 256
 $bmp = New-Object System.Drawing.Bitmap $size, $size
@@ -43,9 +44,9 @@ $g.FillEllipse((New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::Fr
 $font = New-Object System.Drawing.Font 'Segoe UI', 30, ([System.Drawing.FontStyle]::Bold), ([System.Drawing.GraphicsUnit]::Pixel)
 $fmt = New-Object System.Drawing.StringFormat
 $fmt.Alignment = 'Center'
-$g.DrawString('STREPLAY', $font, [System.Drawing.Brushes]::White, (New-Object System.Drawing.RectangleF 0, 196, $size, 44), $fmt)
+$g.DrawString($Label, $font, [System.Drawing.Brushes]::White, (New-Object System.Drawing.RectangleF 0, 196, $size, 44), $fmt)
 
-$out = Join-Path $PSScriptRoot '..\thunderstore\icon.png'
-$bmp.Save((Resolve-Path (Split-Path $out)).Path + '\icon.png', [System.Drawing.Imaging.ImageFormat]::Png)
+$full = Join-Path (Resolve-Path (Split-Path $Out)).Path (Split-Path $Out -Leaf)
+$bmp.Save($full, [System.Drawing.Imaging.ImageFormat]::Png)
 $g.Dispose(); $bmp.Dispose()
-Write-Output "wrote $out"
+Write-Output "wrote $full"

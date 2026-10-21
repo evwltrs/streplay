@@ -1,0 +1,7 @@
+{
+  "name": "StreplayFFmpeg",
+  "version_number": "9.0.2",
+  "website_url": "https://www.gyan.dev/ffmpeg/builds/",
+  "description": "ffmpeg for Streplay: lets Streplay render replays straight to MP4 (H.264/H.265) and MOV (ProRes). Optional; without it Streplay renders PNG frames. Unmodified ffmpeg 9.0.2 essentials build (GPLv3).",
+  "dependencies": []
+}

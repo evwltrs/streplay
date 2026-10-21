@@ -25,10 +25,7 @@ Streplay only records what your own game already shows you. It is marked as vani
 
 Install with a mod manager: **r2modman** or the Thunderstore Mod Manager. BepInEx is installed for you. Start the game with **Start modded**.
 
-To make **video** files (MP4/MOV), Streplay needs **ffmpeg**, which isn't included in the download:
-
-1. Download a Windows build of ffmpeg, for example "ffmpeg-release-essentials" from gyan.dev.
-2. Put `ffmpeg.exe` in `Documents\Streplay\ffmpeg\`, or anywhere on your PATH, or set `FfmpegPath` in the config.
+To render straight to **video** files (MP4/MOV), also install **1nf-StreplayFFmpeg**, which contains ffmpeg. Streplay finds it automatically. If you already have ffmpeg, you can use that instead: put `ffmpeg.exe` in `Documents\Streplay\ffmpeg\` or on your PATH, or set `FfmpegPath` in the config.
 
 Without ffmpeg, renders are saved as PNG frames plus a `.wav` file, which any video editor can import.
 
