@@ -131,6 +131,15 @@ namespace Streplay
 
         int _killFrame = -1;
 
+        // test hook: the next local player is first recorded without arms, as when it shows up before it's ours
+        internal static bool TestDropArms;
+        static bool TestNoArmsOnce()
+        {
+            if (!TestDropArms) return false;
+            TestDropArms = false;
+            return true;
+        }
+
         internal void OnLocalDeath()
         {
             if (IsRecording && Plugin.AutoMarkDeaths.Value) AddMarker("Died", auto: true);
@@ -351,7 +360,18 @@ namespace Streplay
             {
                 var nob = kv.Value;
                 if (nob == null || nob.ParentNetworkObject != null) continue; // nested objects ride along with their root
-                if (!_tracked.ContainsKey(nob.ObjectId)) Track(nob);
+                if (!_tracked.TryGetValue(nob.ObjectId, out var known)) Track(nob);
+                else if (known.IsPlayer && known.Vm.Length == 0 && nob.IsOwner && known.Pickup != null && known.Pickup.fpArms != null)
+                {
+                    // Our own player can turn up a moment before the game hands it to us, so it was first taken for
+                    // someone else's and recorded without first-person arms: start it over as ours, as a respawn does.
+                    Plugin.Log.LogDebug($"Local player {nob.ObjectId} became ours after it was first seen: recording its arms from here");
+                    _tracked.Remove(nob.ObjectId);
+                    _w.Write(Rec.Despawn);
+                    _w.Write(CurrentTime);
+                    _w.Write(nob.ObjectId);
+                    Track(nob);
+                }
             }
 
             _gone.Clear();
@@ -458,7 +478,7 @@ namespace Streplay
                 tr.Values = nob.GetComponent<PlayerValues>();
                 tr.Setup = nob.GetComponent<PlayerSetup>();
                 var arms = tr.Pickup != null ? tr.Pickup.fpArms : null;
-                if (nob.IsOwner && arms != null)
+                if (nob.IsOwner && arms != null && !TestNoArmsOnce())
                     tr.Vm = arms.GetComponentsInChildren<Transform>(true).Take(255).ToArray();
                 // The body's arms are bent by IK onto targets that game scripts move every frame, so we
                 // store the final skeleton pose rather than trying to re-run animation + IK on playback.

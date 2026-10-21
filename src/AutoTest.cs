@@ -156,6 +156,7 @@ namespace Streplay
                     return null;
                 }
                 case "seekview": Log(rp.TestSeekView(a.Length > 1 ? F(a[1]) : 0.05f)); return null;
+                case "droparms": Recorder.TestDropArms = true; return null;
                 case "weaponkill":
                 {
                     // a non-Gun weapon's own kill path (Weapon.KillShockWave -> the game's kill counter), as a rifle kill runs it
