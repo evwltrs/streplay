@@ -43,8 +43,8 @@ namespace Streplay
         }
         KillMark _lastKill;
 
-        string _toast;
-        float _toastUntil;
+        string _toastTitle, _toastSub;
+        float _toastAt = -10f;
 
         sealed class Tracked
         {
@@ -154,7 +154,7 @@ namespace Streplay
             }
             try { k.Meta.Save(); } catch (Exception e) { Plugin.Log.LogWarning($"Marker metadata save failed: {e.Message}"); }
             Plugin.Log.LogInfo($"Flagged the kill at {k.Marker.T:0.00}s in {k.Meta.ReplayFile}");
-            ShowToast(k.Meta == _meta ? $"{k.Marker.Label} marked" : $"{k.Marker.Label} marked (previous take)");
+            ShowToast("Kill marked", k.Meta == _meta ? "your last kill" : "your last kill, previous round");
             return true;
         }
 
@@ -321,14 +321,15 @@ namespace Streplay
             var marker = new ReplayMeta.MetaMarker { T = t, Label = label, Auto = auto };
             _meta.Markers.Add(marker);
             try { _meta.Save(); } catch (Exception e) { Plugin.Log.LogWarning($"Marker metadata save failed: {e.Message}"); }
-            ShowToast(auto ? $"Marked: {label}" + (label == "Kill" ? $" ({Plugin.MarkerKey.Value} to flag it)" : "") : "Marker added");
+            if (!auto) ShowToast("Marked", "this moment"); // automatic ones (kills, deaths) stay quiet
             return marker;
         }
 
-        void ShowToast(string text)
+        void ShowToast(string title, string sub)
         {
-            _toast = text;
-            _toastUntil = Time.unscaledTime + 2f;
+            _toastTitle = title;
+            _toastSub = sub;
+            _toastAt = Time.unscaledTime;
         }
 
         // ---------------------------------------------------------------- sampling
@@ -910,24 +911,48 @@ namespace Streplay
 
         // ---------------------------------------------------------------- HUD
 
-        static GUIStyle _recStyle, _toastStyle;
+        const float ToastTime = 2.2f;
 
+        // REC tag and the marker notice, in the same look as the rest of Streplay's UI
         void OnGUI()
         {
-            if (ReplayPlayer.Active) return;
-            if (_recStyle == null)
-            {
-                _recStyle = new GUIStyle(GUI.skin.label) { fontSize = 14, fontStyle = FontStyle.Bold };
-                _recStyle.normal.textColor = new Color(1f, 0.25f, 0.25f);
-                _toastStyle = new GUIStyle(GUI.skin.box) { fontSize = 16, alignment = TextAnchor.MiddleCenter };
-            }
-            if (IsRecording && Plugin.ShowRecIndicator.Value)
-                GUI.Label(new Rect(Screen.width - 70, 8, 70, 22), "● REC", _recStyle);
-            if (_toast != null && Time.unscaledTime < _toastUntil)
-            {
-                float w = Mathf.Clamp(_toastStyle.CalcSize(new GUIContent(_toast)).x + 24, 260, Screen.width - 40);
-                GUI.Box(new Rect(Screen.width / 2f - w / 2f, 40, w, 32), _toast, _toastStyle);
-            }
+            if (ReplayPlayer.Active || Event.current.type != EventType.Repaint) return;
+            bool rec = IsRecording && Plugin.ShowRecIndicator.Value;
+            float age = Time.unscaledTime - _toastAt;
+            if (!rec && age > ToastTime) return;
+            Ui.Begin();
+            if (rec) DrawRecTag();
+            if (age <= ToastTime) DrawMarkToast(age);
+            Ui.End();
+        }
+
+        static readonly Color RecRed = new Color(0.86f, 0.28f, 0.22f);
+
+        void DrawRecTag()
+        {
+            var r = new Rect(Ui.W - 84f, 12f, 72f, 24f);
+            Ui.Slant(r, Ui.WithA(Ui.Bg, 0.8f));
+            float pulse = 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * 3f);
+            Ui.Circle(new Vector2(r.x + 19f, r.center.y), 4f, Ui.WithA(RecRed, 0.55f + 0.45f * pulse));
+            Ui.Text(new Rect(r.x + 30f, r.y, r.width - 30f, r.height), "REC", 12, Ui.Mint, true);
+        }
+
+        // slides down and fades in, holds, fades out
+        void DrawMarkToast(float age)
+        {
+            float a = Mathf.Clamp01(age * 8f) * Mathf.Clamp01((ToastTime - age) * 4f);
+            float drop = (1f - Mathf.Clamp01(age * 8f)) * 8f;
+            string title = _toastTitle.ToUpperInvariant();
+            float w = Mathf.Max(Ui.Measure(title, 16, true), Ui.Measure(_toastSub, 12)) + 76f;
+            var r = new Rect(Ui.W / 2f - w / 2f, 64f - drop, w, 46f);
+            var keep = GUI.color;
+            GUI.color = new Color(1f, 1f, 1f, a);
+            Ui.Slant(r, Ui.Bg);
+            Ui.Slant(new Rect(r.x + 10f, r.y + 9f, 7f, r.height - 18f), Ui.Accent);
+            GUI.DrawTexture(new Rect(r.x + 26f, r.y + 14f, 18f, 18f), Ui.IconFlag, ScaleMode.ScaleToFit, true, 0f, Ui.WithA(Ui.Accent, a), 0f, 0f); // this overload ignores GUI.color
+            Ui.Text(new Rect(r.x + 52f, r.y + 5f, w - 56f, 22f), title, 16, Ui.Bright, true);
+            Ui.Text(new Rect(r.x + 52f, r.y + 24f, w - 56f, 16f), _toastSub, 12, Ui.Dim);
+            GUI.color = keep;
         }
     }
 }
