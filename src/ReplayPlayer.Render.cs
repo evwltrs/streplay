@@ -775,7 +775,7 @@ namespace Streplay
             float total = p.Need / rate, done = p.Recording ? p.Tap.Frames / rate : 0f;
             var r = new Rect(Ui.W / 2f - 330f, Ui.H - 140f, 660f, 104f);
             Ui.Panel(r, 14f);
-            Ui.Text(new Rect(r.x + 24f, r.y + 12f, 420f, 28f), "Recording the sound".ToUpperInvariant(), 18, Color.white, true);
+            Ui.Text(new Rect(r.x + 24f, r.y + 12f, 420f, 28f), "Recording the sound".ToUpperInvariant(), 18, Ui.Bright, true);
             Ui.Text(new Rect(r.x + 24f, r.y + 40f, r.width - 48f, 20f), $"Plays the clip once in real time ({done:0.0} / {total:0.0} s), then the video renders.", 12, Ui.Dim);
             EscChip(r);
             Ui.Bar(new Rect(r.x + 24f, r.y + 72f, r.width - 48f, 8f), done / Mathf.Max(0.01f, total), Ui.Accent);
@@ -793,26 +793,26 @@ namespace Streplay
                 if (h > Ui.H - 200f) { h = Ui.H - 200f; w = h * a; }
                 var pr = new Rect((Ui.W - w) / 2f, 30f, w, h);
                 if (Event.current.type == EventType.Repaint) GUI.DrawTexture(pr, _finalRT, ScaleMode.ScaleToFit, false);
-                Ui.Border(pr, new Color(1f, 1f, 1f, 0.12f), 1f, 4f);
+                Ui.Border(pr, Ui.Wash(0.12f), 1f, 4f);
             }
             var took = DateTime.Now - j.Began;
             string eta = done > 0.01f ? $"about {TimeSpan.FromSeconds(took.TotalSeconds * (1 - done) / done):m\\:ss} left" : "estimating…";
             var r = new Rect(Ui.W / 2f - 380f, Ui.H - 140f, 760f, 112f);
             Ui.Panel(r, 14f);
-            Ui.Text(new Rect(r.x + 24f, r.y + 12f, 420f, 28f), "Rendering".ToUpperInvariant(), 18, Color.white, true);
+            Ui.Text(new Rect(r.x + 24f, r.y + 12f, 420f, 28f), "Rendering".ToUpperInvariant(), 18, Ui.Bright, true);
             Ui.Text(new Rect(r.x + 24f, r.y + 40f, r.width - 48f, 20f),
                 $"frame {j.Frame + 1} / {j.Frames}" + (j.SubOf(j.Frame) > 1 ? $"  ·  sub-frame {j.SubIndex + 1}/{j.SubOf(j.Frame)}" : "") +
                 $"  ·  {j.W}×{j.H} @ {j.Fps} fps  ·  {j.Format}" + (j.Ramp != null ? "  ·  slow-mo" : ""), 12, Ui.Dim);
             EscChip(r);
             Ui.Bar(new Rect(r.x + 24f, r.y + 74f, r.width - 140f, 8f), done, Ui.Accent);
-            Ui.Text(new Rect(r.xMax - 110f, r.y + 64f, 90f, 28f), $"{done * 100f:0}%", 20, Color.white, true, TextAnchor.MiddleRight);
+            Ui.Text(new Rect(r.xMax - 110f, r.y + 64f, 90f, 28f), $"{done * 100f:0}%", 20, Ui.Bright, true, TextAnchor.MiddleRight);
             Ui.Text(new Rect(r.x + 24f, r.y + 86f, 300f, 20f), eta, 11, Ui.Faint);
         }
 
         static void EscChip(Rect card)
         {
             var c = new Rect(card.xMax - 140f, card.y + 16f, 116f, 24f);
-            Ui.Slant(c, new Color(1f, 1f, 1f, 0.08f));
+            Ui.Slant(c, Ui.Wash(0.08f));
             Ui.Text(c, "ESC CANCELS", 11, Ui.Dim, true, TextAnchor.MiddleCenter);
         }
 
@@ -833,7 +833,7 @@ namespace Streplay
             Ui.Panel(p, 14f);
 
             // header
-            Ui.Text(new Rect(p.x + 22f, p.y + 12f, 200f, 30f), "RENDER", 22, Color.white, true);
+            Ui.Text(new Rect(p.x + 22f, p.y + 12f, 200f, 30f), "RENDER", 22, Ui.Bright, true);
             float start = _in ?? _t, stop = _out ?? _data.Duration;
             if (stop <= start) stop = _data.Duration;
             int fps = Mathf.Max(1, Plugin.RenderFps.Value);

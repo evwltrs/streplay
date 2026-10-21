@@ -172,7 +172,7 @@ namespace Streplay
                 var glow = new Rect(r.x + h * 0.12f, r.y + h * 0.14f, r.width - h * 0.24f, h * 0.72f);
                 Ui.Fill(glow, new Color(MenuLime.r, MenuLime.g, MenuLime.b, 0.10f), glow.height / 2f);
             }
-            int size = Mathf.Clamp(Mathf.RoundToInt(h * 0.5f), 11, 40);
+            int size = Mathf.Clamp(Mathf.RoundToInt(h * 0.6f), 11, 44);
             float x = r.x + h * 0.5f;
             // the REC light: on while the menu waits, brighter on hover
             float dot = Mathf.Max(3f, h * 0.11f);
@@ -206,7 +206,7 @@ namespace Streplay
             float x = win.x + 26f, right = win.xMax - 26f, y = win.y + 20f;
 
             // header
-            Ui.Text(new Rect(x, y - 2f, 220f, 40f), "REPLAYS", 30, Color.white, true);
+            Ui.Text(new Rect(x, y - 2f, 220f, 40f), "REPLAYS", 30, Ui.Bright, true);
             float tabsW = Ui.AutoW("Rounds", null, 32f, 13) + Ui.AutoW("Highlights", null, 32f, 13) + 3f;
             int tab = Ui.Segmented(new Rect(x + 180f, y + 3f, tabsW, 32f), new[] { "Rounds", "Highlights" }, _highlightsTab ? 1 : 0, null, 13);
             _highlightsTab = tab == 1;
@@ -230,6 +230,10 @@ namespace Streplay
             if (_highlightsTab) DrawHighlights(body); else DrawRounds(body);
         }
 
+        // "1 round", "2 rounds", "3 MATCHES"
+        static string N(int n, string word) =>
+            n == 1 ? $"1 {word}" : $"{n} {word}" + (word.EndsWith("CH") ? "ES" : word.EndsWith("ch") ? "es" : char.IsUpper(word[word.Length - 1]) ? "S" : "s");
+
         // ---------------------------------------------------------------- rounds
 
         float _roundsScroll, _hlScrollY;
@@ -240,7 +244,7 @@ namespace Streplay
             var matches = items.GroupBy(MatchId).ToList();
 
             if (Ui.Chip(new Rect(body.x, body.y, 150f, 28f), "Marked only", _markersOnly, "Only rounds with markers")) _markersOnly = !_markersOnly;
-            Ui.Text(new Rect(body.x + 166f, body.y, 400f, 28f), $"{items.Count} ROUNDS  ·  {matches.Count} MATCHES", 12, Ui.Dim, true);
+            Ui.Text(new Rect(body.x + 166f, body.y, 400f, 28f), N(items.Count, "ROUND") + "  ·  " + N(matches.Count, "MATCH"), 12, Ui.Dim, true);
             var list = new Rect(body.x, body.y + 40f, body.width, body.height - 40f);
 
             // measure, then draw the visible part
@@ -266,11 +270,11 @@ namespace Streplay
                 var others = g.SelectMany(m => m.Players).Where(p => !p.IsLocal).Select(p => Strip(p.Name)).Distinct().Take(5).ToList();
                 int kills = g.Sum(m => m.Highlights?.Sum(h => h.Kills) ?? 0), flagged = g.Sum(m => m.Markers.Count(k => !k.Auto));
                 var hr = new Rect(0f, y + 6f, w, 38f);
-                if (Ui.Hover(hr)) Ui.Slant(hr, new Color(1f, 1f, 1f, 0.05f));
+                if (Ui.Hover(hr)) Ui.Slant(hr, Ui.Wash(0.05f));
                 Ui.Icon(new Rect(12f, hr.center.y - 6f, 12f, 12f), open ? Ui.IconDown : Ui.IconPlay, Ui.Accent);
-                Ui.Text(new Rect(32f, hr.y, 260f, hr.height), $"{first.StartUtc.ToLocalTime():ddd MMM d  ·  HH:mm}".ToUpperInvariant(), 16, Color.white, true);
+                Ui.Text(new Rect(32f, hr.y, 260f, hr.height), $"{first.StartUtc.ToLocalTime():ddd MMM d  ·  HH:mm}".ToUpperInvariant(), 16, Ui.Bright, true);
                 Ui.Text(new Rect(260f, hr.y, w - 270f, hr.height),
-                    $"{g.Count()} rounds" + (kills > 0 ? $"  ·  {kills} kills" : "") + (flagged > 0 ? $"  ·  {flagged} flagged" : "") +
+                    N(g.Count(), "round") + (kills > 0 ? "  ·  " + N(kills, "kill") : "") + (flagged > 0 ? $"  ·  {flagged} flagged" : "") +
                     (others.Count > 0 ? $"  ·  vs {string.Join(", ", others)}" : ""), 12, Ui.Dim);
                 if (GUI.Button(hr, GUIContent.none, GUIStyle.none))
                 {
@@ -298,11 +302,11 @@ namespace Streplay
         void DrawRound(Rect r, ReplayMeta m, int index)
         {
             bool hover = Ui.Hover(r);
-            Ui.Fill(r, hover ? new Color(1f, 1f, 1f, 0.07f) : index % 2 == 0 ? new Color(1f, 1f, 1f, 0.03f) : new Color(0f, 0f, 0f, 0f));
+            Ui.Fill(r, hover ? Ui.Wash(0.07f) : index % 2 == 0 ? Ui.Wash(0.03f) : new Color(0f, 0f, 0f, 0f));
             if (hover) Ui.Fill(new Rect(r.x, r.y, 3f, r.height), Ui.Accent);
             float top = r.y + 4f;
             Ui.Text(new Rect(r.x + 14f, top, 30f, 38f), $"{m.RoundIndex + 1}", 13, Ui.Faint, true);
-            Ui.Text(new Rect(r.x + 46f, top, 320f, 38f), m.Scene, 16, Color.white, true);
+            Ui.Text(new Rect(r.x + 46f, top, 320f, 38f), m.Scene, 16, Ui.Bright, true);
             float tx = r.x + 46f + Mathf.Min(320f, Ui.Measure(m.Scene, 16, true)) + 12f;
             if (m.Take > 0) { var tr = new Rect(tx, top + 9f, 66f, 20f); Ui.Slant(tr, Ui.AccentSoft); Ui.Text(tr, $"TAKE {m.Take}", 11, Ui.Accent, true, TextAnchor.MiddleCenter); }
             Ui.Text(new Rect(r.x + 420f, top, 90f, 38f), ReplayPlayer.Fmt(m.Duration) + (m.Finished ? "" : " (incomplete)"), 12, Ui.Dim);
@@ -325,7 +329,7 @@ namespace Streplay
                     bool h = Ui.Hover(cr);
                     Ui.Slant(cr, new Color(c.r, c.g, c.b, h ? 0.32f : 0.16f));
                     Ui.Slant(new Rect(cr.x + 7f, cr.y + 6f, 5f, cr.height - 12f), c);
-                    Ui.Text(new Rect(cr.x + 18f, cr.y, cw - 20f, cr.height), label, 11, h ? Color.white : Ui.TextC, true);
+                    Ui.Text(new Rect(cr.x + 18f, cr.y, cw - 20f, cr.height), label, 11, h ? Ui.Bright : Ui.TextC, true);
                     if (GUI.Button(cr, GUIContent.none, GUIStyle.none)) Play(m, Mathf.Max(0, mk.T - Plugin.MarkerPreroll.Value));
                     cx += cw + 6f;
                     shown++;
@@ -343,7 +347,7 @@ namespace Streplay
             if (max > 0f)
             {
                 float frac = area.height / content;
-                Ui.Fill(new Rect(area.xMax - 5f, area.y + (area.height - area.height * frac) * (offset / max), 5f, area.height * frac), new Color(1f, 1f, 1f, 0.2f), 2.5f);
+                Ui.Fill(new Rect(area.xMax - 5f, area.y + (area.height - area.height * frac) * (offset / max), 5f, area.height * frac), Ui.Wash(0.2f), 2.5f);
             }
             return offset;
         }
@@ -407,7 +411,7 @@ namespace Streplay
         void DrawHighlightRow(Rect r, ReplayMeta m, ReplayMeta.MetaHighlight h)
         {
             bool hover = Ui.Hover(r);
-            Ui.Fill(r, hover ? new Color(1f, 1f, 1f, 0.07f) : new Color(1f, 1f, 1f, 0.03f));
+            Ui.Fill(r, hover ? Ui.Wash(0.07f) : Ui.Wash(0.03f));
             if (hover) Ui.Fill(new Rect(r.x, r.y, 3f, r.height), Ui.Accent);
 
             // score badge
@@ -427,7 +431,7 @@ namespace Streplay
                 if (tx + tw > r.xMax - 120f) break;
                 var tr = new Rect(tx, ty, tw, 22f);
                 Ui.Slant(tr, new Color(c.r, c.g, c.b, 0.2f));
-                Ui.Text(tr, tu, 11, Color.Lerp(c, Color.white, 0.3f), true, TextAnchor.MiddleCenter);
+                Ui.Text(tr, tu, 11, Color.Lerp(c, Ui.Bright, 0.3f), true, TextAnchor.MiddleCenter);
                 tx += tw + 6f;
             }
             Ui.Text(new Rect(r.x + 84f, r.y + 30f, r.width - 200f, 22f),

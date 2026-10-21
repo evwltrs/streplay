@@ -4,28 +4,37 @@ using UnityEngine;
 
 namespace Streplay
 {
-    // The look of Streplay's own UI (replay player, render panel, browser), styled after STRAFTAT's own HUD:
-    // black panels, slanted blocks, bold italic uppercase type, white for the main action and the crosshair's
-    // magenta as the accent. Drawn with IMGUI, laid out for a 1080p screen and scaled up on bigger ones
-    // (Begin sets GUI.matrix; W/H are the scaled screen size). Buttons size themselves from their label (AutoW)
-    // so padding is the same everywhere.
+    // The look of Streplay's own UI (replay player, render panel, browser), styled after STRAFTAT's main menu:
+    // deep green-black panels, sage and mint text, the menu's lime-yellow for the accent and warm white for headlines,
+    // slanted blocks and bold italic uppercase type (the game's own font when it ships it). Drawn with IMGUI, laid out
+    // for a 1080p screen and scaled up on bigger ones (Begin sets GUI.matrix; W/H are the scaled screen size). Buttons
+    // size themselves from their label (AutoW) so padding is the same everywhere.
     internal static class Ui
     {
-        public static readonly Color Bg = new Color(0.02f, 0.02f, 0.022f, 0.96f);
-        public static readonly Color Raised = new Color(0.1f, 0.1f, 0.105f, 1f);
-        public static readonly Color RaisedHover = new Color(0.17f, 0.17f, 0.18f, 1f);
-        public static readonly Color Line = new Color(1f, 1f, 1f, 0.07f);
-        public static readonly Color TextC = new Color(0.95f, 0.95f, 0.95f);
-        public static readonly Color Dim = new Color(0.6f, 0.6f, 0.62f);
-        public static readonly Color Faint = new Color(0.4f, 0.4f, 0.42f);
-        public static readonly Color Accent = new Color(1f, 0.17f, 0.84f);
-        public static readonly Color AccentSoft = new Color(1f, 0.17f, 0.84f, 0.22f);
-        public static readonly Color Kill = new Color(1f, 0.58f, 0.2f);
-        public static readonly Color Death = new Color(0.6f, 0.6f, 0.62f);
-        public static readonly Color Good = new Color(0.45f, 0.92f, 0.55f);
-        public static readonly Color Warn = new Color(1f, 0.78f, 0.3f);
-        public static readonly Color Danger = new Color(1f, 0.32f, 0.32f);
-        public static readonly Color OnAccent = new Color(0f, 0f, 0f);
+        // sampled from the game's menu: lime (233,255,145) headlines, mint (187,243,192) labels, warm white (254,255,222)
+        public static readonly Color Bg = new Color(0.035f, 0.055f, 0.045f, 0.96f);
+        public static readonly Color Raised = new Color(0.085f, 0.125f, 0.105f, 1f);
+        public static readonly Color RaisedHover = new Color(0.14f, 0.2f, 0.165f, 1f);
+        public static readonly Color Line = new Color(0.73f, 0.95f, 0.75f, 0.1f);
+        public static readonly Color TextC = new Color(0.9f, 0.96f, 0.86f);
+        public static readonly Color Dim = new Color(0.6f, 0.7f, 0.6f);
+        public static readonly Color Faint = new Color(0.4f, 0.48f, 0.42f);
+        public static readonly Color Bright = new Color(0.996f, 1f, 0.87f);
+        public static readonly Color Mint = new Color(0.733f, 0.953f, 0.753f);
+        public static readonly Color Accent = new Color(0.914f, 1f, 0.569f);
+        public static readonly Color AccentSoft = new Color(0.914f, 1f, 0.569f, 0.2f);
+        public static readonly Color Kill = new Color(1f, 0.64f, 0.27f);
+        public static readonly Color Death = new Color(0.55f, 0.63f, 0.56f);
+        public static readonly Color Good = new Color(0.6f, 0.95f, 0.66f);
+        public static readonly Color Warn = new Color(1f, 0.82f, 0.4f);
+        public static readonly Color Danger = new Color(0.92f, 0.38f, 0.3f);
+        public static readonly Color OnAccent = new Color(0.04f, 0.07f, 0.045f);
+        // the main-action button: pale mint, going lime on hover
+        public static readonly Color PrimaryBg = new Color(0.82f, 0.93f, 0.78f);
+
+        // see-through overlays (hover rows, tracks, separators): mint-tinted instead of plain white
+        public static Color Wash(float a) => new Color(0.75f, 0.95f, 0.78f, a);
+        public static Color WithA(Color c, float a) => new Color(c.r, c.g, c.b, a);
 
         public const float SlantTan = 0.2126f; // tan 12°: how far every block leans
         public const float PadX = 16f;         // text padding inside buttons, each side
@@ -54,7 +63,7 @@ namespace Streplay
             _oldCursor = skin.settings.cursorColor;
             _oldSelection = skin.settings.selectionColor;
             skin.settings.cursorColor = Accent;
-            skin.settings.selectionColor = new Color(1f, 0.17f, 0.84f, 0.35f);
+            skin.settings.selectionColor = WithA(Accent, 0.35f);
         }
 
         public static void End()
@@ -93,8 +102,8 @@ namespace Streplay
             Plugin.Log.LogDebug($"[ui] font: {_font.name}{(_gameFont ? " (the game's)" : "")}");
             _field = new GUIStyle { font = _font, fontSize = 13, padding = new RectOffset(10, 10, 4, 4), alignment = TextAnchor.MiddleLeft, clipping = TextClipping.Clip, fontStyle = _gameFont ? FontStyle.Normal : FontStyle.Italic };
             _field.normal.textColor = TextC;
-            _field.focused.textColor = Color.white;
-            _field.hover.textColor = Color.white;
+            _field.focused.textColor = Bright;
+            _field.hover.textColor = Bright;
         }
 
         // ---------------------------------------------------------------- text
@@ -206,7 +215,7 @@ namespace Streplay
             float w = Measure(_tip, 12) + 24f;
             var r = new Rect(Mathf.Min(m.x + 14f, W - w - 6f), m.y + 20f, w, 26f);
             if (r.yMax > H - 4f) r.y = m.y - 32f;
-            Slant(r, new Color(0f, 0f, 0f, 0.97f));
+            Slant(r, new Color(0.02f, 0.035f, 0.028f, 0.97f));
             Fill(new Rect(r.x + 4f, r.yMax - 2f, r.width - 8f, 2f), Accent);
             Text(new Rect(r.x + 12f, r.y, r.width, r.height), _tip, 12, TextC);
         }
@@ -220,19 +229,19 @@ namespace Streplay
         {
             bool hover = Hover(r), down = hover && Input.GetMouseButton(0);
             Color bg, fg;
-            if (!GUI.enabled) { bg = new Color(0.08f, 0.08f, 0.085f, 1f); fg = Faint; }
+            if (!GUI.enabled) { bg = new Color(0.06f, 0.085f, 0.07f, 1f); fg = Faint; }
             else switch (kind)
             {
                 case Kind.Accent:
-                    bg = down ? Accent * 0.85f : hover ? Color.Lerp(Accent, Color.white, 0.2f) : Accent; bg.a = 1f; fg = OnAccent; break;
+                    bg = down ? Accent * 0.85f : hover ? Color.Lerp(Accent, Bright, 0.2f) : Accent; bg.a = 1f; fg = OnAccent; break;
                 case Kind.Primary:
-                    bg = down ? new Color(0.8f, 0.8f, 0.8f) : hover ? Color.white : new Color(0.92f, 0.92f, 0.92f); fg = OnAccent; break;
+                    bg = down ? Mint : hover ? Accent : PrimaryBg; fg = OnAccent; break;
                 case Kind.Danger:
-                    bg = hover ? new Color(0.35f, 0.08f, 0.08f, 1f) : Raised; fg = hover ? Color.white : new Color(1f, 0.55f, 0.55f); break;
+                    bg = hover ? new Color(0.36f, 0.12f, 0.09f, 1f) : Raised; fg = hover ? Bright : new Color(1f, 0.6f, 0.52f); break;
                 case Kind.Ghost:
-                    bg = hover ? Raised : new Color(0f, 0f, 0f, 0f); fg = hover ? Color.white : Dim; break;
+                    bg = hover ? Raised : new Color(0f, 0f, 0f, 0f); fg = hover ? Bright : Dim; break;
                 default:
-                    bg = on ? new Color(0.92f, 0.92f, 0.92f) : down ? new Color(0.22f, 0.22f, 0.23f) : hover ? RaisedHover : Raised;
+                    bg = on ? PrimaryBg : down ? new Color(0.2f, 0.28f, 0.23f) : hover ? RaisedHover : Raised;
                     fg = on ? OnAccent : TextC;
                     break;
             }
@@ -267,9 +276,9 @@ namespace Streplay
                 float w = widths[i] * scale + extra;
                 var seg = new Rect(x, r.y, w, r.height);
                 bool on = i == selected, hover = Hover(seg);
-                Slant(seg, on ? new Color(0.92f, 0.92f, 0.92f) : hover ? RaisedHover : Raised);
+                Slant(seg, on ? PrimaryBg : hover ? RaisedHover : Raised);
                 if (on) Fill(new Rect(seg.x + seg.height * SlantTan * 0.5f + 3f, seg.yMax - 3f, seg.width - seg.height * SlantTan - 6f, 3f), Accent);
-                Text(seg, labels[i].ToUpperInvariant(), size, on ? OnAccent : hover ? Color.white : TextC, true, TextAnchor.MiddleCenter);
+                Text(seg, labels[i].ToUpperInvariant(), size, on ? OnAccent : hover ? Bright : TextC, true, TextAnchor.MiddleCenter);
                 if (GUI.Button(seg, GUIContent.none, GUIStyle.none)) result = i;
                 x += w + gap;
             }
@@ -280,23 +289,23 @@ namespace Streplay
         public static bool Chip(Rect r, string label, bool on, string tip = null)
         {
             bool hover = Hover(r);
-            Slant(r, on ? (hover ? RaisedHover : new Color(0.14f, 0.14f, 0.15f, 1f)) : hover ? Raised : new Color(0.06f, 0.06f, 0.065f, 1f));
-            Slant(new Rect(r.x + 6f, r.y + 5f, 6f, r.height - 10f), on ? Accent : new Color(0.3f, 0.3f, 0.32f));
-            Text(new Rect(r.x + 20f, r.y, r.width - 24f, r.height), label.ToUpperInvariant(), 11, on ? Color.white : Faint, true);
+            Slant(r, on ? (hover ? RaisedHover : new Color(0.12f, 0.17f, 0.14f, 1f)) : hover ? Raised : new Color(0.05f, 0.075f, 0.06f, 1f));
+            Slant(new Rect(r.x + 6f, r.y + 5f, 6f, r.height - 10f), on ? Accent : new Color(0.28f, 0.36f, 0.3f));
+            Text(new Rect(r.x + 20f, r.y, r.width - 24f, r.height), label.ToUpperInvariant(), 11, on ? Bright : Faint, true);
             Tip(r, tip);
             return GUI.Button(r, GUIContent.none, GUIStyle.none);
         }
 
         public static string Field(Rect r, string value, int maxLength = 200)
         {
-            Slant(r, new Color(0.07f, 0.07f, 0.075f, 1f));
-            Fill(new Rect(r.x + r.height * SlantTan * 0.5f, r.yMax - 2f, r.width - r.height * SlantTan, 2f), Hover(r) ? Accent : new Color(1f, 1f, 1f, 0.15f));
+            Slant(r, new Color(0.06f, 0.09f, 0.075f, 1f));
+            Fill(new Rect(r.x + r.height * SlantTan * 0.5f, r.yMax - 2f, r.width - r.height * SlantTan, 2f), Hover(r) ? Accent : Wash(0.15f));
             return GUI.TextField(new Rect(r.x + 4f, r.y, r.width - 8f, r.height), value ?? "", maxLength, _field);
         }
 
         public static void Bar(Rect r, float fraction, Color c)
         {
-            Slant(r, new Color(1f, 1f, 1f, 0.08f));
+            Slant(r, Wash(0.08f));
             if (fraction > 0.001f) Slant(new Rect(r.x, r.y, Mathf.Max(r.height, r.width * Mathf.Clamp01(fraction)), r.height), c);
         }
 

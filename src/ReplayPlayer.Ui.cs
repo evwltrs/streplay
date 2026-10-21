@@ -525,7 +525,7 @@ namespace Streplay
             Ui.Text(new Rect(r.x + 24f, r.y + 40f, r.width - 48f, 20f), _meta != null ? _meta.Scene : "", 12, Ui.Dim);
             // an indeterminate sweep
             var bar = new Rect(r.x + 24f, r.y + 68f, r.width - 48f, 4f);
-            Ui.Fill(bar, new Color(1f, 1f, 1f, 0.08f));
+            Ui.Fill(bar, Ui.Wash(0.08f));
             float f = Mathf.Repeat(Time.unscaledTime * 0.8f, 1.3f) - 0.3f;
             Ui.Fill(new Rect(bar.x + bar.width * Mathf.Clamp01(f), bar.y, bar.width * Mathf.Clamp(0.3f, 0f, 1f - Mathf.Clamp01(f)), 4f), Ui.Accent);
         }
@@ -540,7 +540,7 @@ namespace Streplay
             GUI.color = new Color(1f, 1f, 1f, a);
             Ui.Slant(r, new Color(0f, 0f, 0f, 0.95f));
             Ui.Slant(new Rect(r.x + 10f, r.y + 10f, 7f, r.height - 20f), Ui.Accent);
-            Ui.Text(new Rect(r.x + 28f, r.y, r.width - 40f, r.height), _toast, 14, Color.white, true);
+            Ui.Text(new Rect(r.x + 28f, r.y, r.width - 40f, r.height), _toast, 14, Ui.Bright, true);
             GUI.color = c;
         }
 
@@ -566,7 +566,7 @@ namespace Streplay
             // header: time, map, camera, speed; clip range on the right
             float x = card.x + 20f, y = card.y + 10f;
             string now = Fmt(_t);
-            Ui.Text(new Rect(x, y - 2f, 160f, 34f), now, 26, Color.white, true);
+            Ui.Text(new Rect(x, y - 2f, 160f, 34f), now, 26, Ui.Bright, true);
             float tw = Ui.Measure(now, 26, true);
             Ui.Text(new Rect(x + tw + 8f, y + 6f, 100f, 24f), "/ " + Fmt(_data.Duration), 13, Ui.Dim, true);
             x += tw + 96f;
@@ -583,7 +583,7 @@ namespace Streplay
                 var cr = new Rect(card.xMax - cw - 20f, y + 2f, cw, 28f);
                 Ui.Slant(cr, Ui.AccentSoft);
                 Ui.Text(new Rect(cr.x + 18f, cr.y, 40f, cr.height), "CLIP", 12, Ui.Accent, true);
-                Ui.Text(new Rect(cr.x + 58f, cr.y, cw - 90f, cr.height), clip, 13, Color.white, true);
+                Ui.Text(new Rect(cr.x + 58f, cr.y, cw - 90f, cr.height), clip, 13, Ui.Bright, true);
                 if (Ui.Button(new Rect(cr.xMax - 34f, cr.y + 2f, 26f, 24f), "", false, Ui.Kind.Ghost, Ui.IconClose, 12, "Clear the clip range")) { _in = null; _out = null; }
             }
 
@@ -626,7 +626,7 @@ namespace Streplay
             var kills = _localKills.Where(k => !markers.Any(m => Mathf.Abs(m.T - k.T) < 0.4f)).ToList();
 
             // ---- drawing
-            Ui.Slant(tr, new Color(1f, 1f, 1f, 0.06f), 0.12f);
+            Ui.Slant(tr, Ui.Wash(0.06f), 0.12f);
             GUI.BeginGroup(new Rect(tr.x, tr.y - 16f, tr.width, tr.height + 32f));
             var local = new Rect(0f, 16f, tr.width, tr.height);
             float LX(float t) => X(t) - tr.x;
@@ -638,22 +638,22 @@ namespace Streplay
             for (float t = Mathf.Ceil(v0 / step) * step; t <= v1; t += step)
             {
                 float lx = LX(t);
-                Ui.Fill(new Rect(lx, local.yMax - 9f, 1f, 9f), new Color(1f, 1f, 1f, 0.2f));
+                Ui.Fill(new Rect(lx, local.yMax - 9f, 1f, 9f), Ui.Wash(0.2f));
                 Ui.Text(new Rect(lx + 4f, local.y + 2f, 60f, 14f), step < 1f ? $"{t:0.0#}" : Fmt(t).Split('.')[0], 10, Ui.Faint);
                 for (int k = 1; k < 5; k++)
                 {
                     float mx = LX(t + step * k / 5f);
-                    if (mx < local.width) Ui.Fill(new Rect(mx, local.yMax - 4f, 1f, 4f), new Color(1f, 1f, 1f, 0.1f));
+                    if (mx < local.width) Ui.Fill(new Rect(mx, local.yMax - 4f, 1f, 4f), Ui.Wash(0.1f));
                 }
             }
 
             // played part, clip range
-            Ui.Fill(new Rect(0f, local.y, Mathf.Clamp(LX(_t), 0f, local.width), local.height), new Color(1f, 1f, 1f, 0.05f));
+            Ui.Fill(new Rect(0f, local.y, Mathf.Clamp(LX(_t), 0f, local.width), local.height), Ui.Wash(0.05f));
             if (_in.HasValue || _out.HasValue)
             {
                 float a = LX(_in ?? 0f), b = LX(_out ?? dur);
                 var range = new Rect(a, local.y, Mathf.Max(1f, b - a), local.height);
-                Ui.Fill(range, new Color(1f, 0.17f, 0.84f, 0.22f));
+                Ui.Fill(range, Ui.WithA(Ui.Accent, 0.22f));
                 Ui.Fill(new Rect(range.x, range.y, range.width, 2f), Ui.Accent);
                 Ui.Fill(new Rect(range.x, range.yMax - 2f, range.width, 2f), Ui.Accent);
             }
@@ -678,8 +678,8 @@ namespace Streplay
             float px = LX(_t);
             if (px >= -2f && px <= local.width + 2f)
             {
-                Ui.Fill(new Rect(px - 1.5f, local.y - 2f, 3f, local.height + 4f), Color.white);
-                Ui.Slant(new Rect(px - 9f, local.y - 14f, 18f, 12f), Color.white);
+                Ui.Fill(new Rect(px - 1.5f, local.y - 2f, 3f, local.height + 4f), Ui.Bright);
+                Ui.Slant(new Rect(px - 9f, local.y - 14f, 18f, 12f), Ui.Bright);
                 Ui.Slant(new Rect(px - 4f, local.y - 11f, 8f, 6f), Ui.Accent);
             }
             GUI.EndGroup();
@@ -691,7 +691,7 @@ namespace Streplay
                 float ht = T(mouse.x);
                 if (_drag == Drag.None)
                 {
-                    Ui.Fill(new Rect(Mathf.Clamp(mouse.x, tr.x, tr.xMax), tr.y, 1f, tr.height), new Color(1f, 1f, 1f, 0.35f));
+                    Ui.Fill(new Rect(Mathf.Clamp(mouse.x, tr.x, tr.xMax), tr.y, 1f, tr.height), Ui.Wash(0.35f));
                     string label = Fmt(ht);
                     foreach (var m in markers) if (Mathf.Abs(X(m.T) - mouse.x) < 7f && mouse.y < tr.y + 16f) label = $"{Fmt(m.T)}   {m.Label}";
                     foreach (var k in kills) if (Mathf.Abs(X(k.T) - mouse.x) < 5f && mouse.y > tr.yMax - 16f) label = $"{Fmt(k.T)}   Kill: {VictimName(k.Victim)}";
@@ -699,7 +699,7 @@ namespace Streplay
                     var bubble = new Rect(Mathf.Clamp(mouse.x - bw / 2f, tr.x - 10f, tr.xMax - bw + 10f), tr.y - 42f, bw, 24f);
                     Ui.Slant(bubble, new Color(0f, 0f, 0f, 0.97f));
                     Ui.Fill(new Rect(bubble.x + 4f, bubble.yMax - 2f, bubble.width - 8f, 2f), Ui.Accent);
-                    Ui.Text(bubble, label, 12, Color.white, true, TextAnchor.MiddleCenter);
+                    Ui.Text(bubble, label, 12, Ui.Bright, true, TextAnchor.MiddleCenter);
                 }
             }
 
@@ -707,8 +707,8 @@ namespace Streplay
             if (zoomed)
             {
                 var ov = new Rect(tr.x, tr.yMax + 6f, tr.width, 4f);
-                Ui.Fill(ov, new Color(1f, 1f, 1f, 0.07f));
-                Ui.Fill(new Rect(ov.x + ov.width * v0 / dur, ov.y, Mathf.Max(6f, ov.width * (v1 - v0) / dur), ov.height), new Color(1f, 1f, 1f, 0.4f));
+                Ui.Fill(ov, Ui.Wash(0.07f));
+                Ui.Fill(new Rect(ov.x + ov.width * v0 / dur, ov.y, Mathf.Max(6f, ov.width * (v1 - v0) / dur), ov.height), Ui.Wash(0.4f));
                 Ui.Fill(new Rect(ov.x + ov.width * _t / dur - 1f, ov.y - 1f, 2f, 6f), Ui.Accent);
             }
 
@@ -781,7 +781,7 @@ namespace Streplay
         static void Handle(float x, Rect local, bool active)
         {
             var r = new Rect(x - 5f, local.y - 6f, 10f, local.height + 12f);
-            Ui.Fill(r, active ? Color.white : Ui.Accent);
+            Ui.Fill(r, active ? Ui.Bright : Ui.Accent);
             Ui.Fill(new Rect(x - 1.5f, r.center.y - 6f, 1f, 12f), new Color(0f, 0f, 0f, 0.45f));
             Ui.Fill(new Rect(x + 0.5f, r.center.y - 6f, 1f, 12f), new Color(0f, 0f, 0f, 0.45f));
         }
@@ -819,7 +819,7 @@ namespace Streplay
             if (Ui.Button(Next("-"), "-", false, Ui.Kind.Normal, null, 15, "Slower ( - )")) _speedIndex = Mathf.Max(0, _speedIndex - 1);
             var sr = Next("0.25x");
             Ui.Slant(sr, new Color(0f, 0f, 0f, 0.6f));
-            Ui.Text(sr, $"{Speed:0.##}X", 13, Speed < 1f ? Ui.Warn : Color.white, true, TextAnchor.MiddleCenter);
+            Ui.Text(sr, $"{Speed:0.##}X", 13, Speed < 1f ? Ui.Warn : Ui.Bright, true, TextAnchor.MiddleCenter);
             if (Ui.Button(Next("+"), "+", false, Ui.Kind.Normal, null, 15, "Faster ( = )")) _speedIndex = Mathf.Min(Speeds.Length - 1, _speedIndex + 1);
             Gap();
 
@@ -870,7 +870,7 @@ namespace Streplay
             var r = new Rect(Ui.W - w - 16f, Ui.H - 150f - 32f - h, w, h);
             Claim(r);
             Ui.Panel(r);
-            Ui.Text(new Rect(r.x + 20f, r.y + 10f, 200f, 24f), "SHORTCUTS", 15, Color.white, true);
+            Ui.Text(new Rect(r.x + 20f, r.y + 10f, 200f, 24f), "SHORTCUTS", 15, Ui.Bright, true);
             for (int i = 0; i < lines.Length; i++)
             {
                 float ly = r.y + 40f + i * 22f;
@@ -897,7 +897,7 @@ namespace Streplay
             Claim(r);
             Ui.Panel(r);
 
-            Ui.Text(new Rect(r.x + 18f, r.y + 12f, 140f, 24f), "STREPLAY", 15, Color.white, true);
+            Ui.Text(new Rect(r.x + 18f, r.y + 12f, 140f, 24f), "STREPLAY", 15, Ui.Bright, true);
             Ui.Text(new Rect(r.x + 110f, r.y + 12f, w - 128f, 24f), _data.Header.Scene.ToUpperInvariant(), 12, Ui.Dim, true, TextAnchor.MiddleRight);
 
             var view = new Rect(r.x + 10f, r.y + 42f, w - 20f, r.height - 50f);
@@ -957,7 +957,7 @@ namespace Streplay
             {
                 float frac = view.height / inner;
                 var bar = new Rect(view.xMax - 4f, view.y + (view.height - view.height * frac) * (_sideScroll2.y / (inner - view.height)), 4f, view.height * frac);
-                Ui.Fill(bar, new Color(1f, 1f, 1f, 0.2f), 2f);
+                Ui.Fill(bar, Ui.Wash(0.2f), 2f);
             }
         }
 
@@ -965,11 +965,11 @@ namespace Streplay
         bool ListRow(Rect r, string lead, string main, string tag, bool active, Color dot)
         {
             bool hover = Ui.Hover(r);
-            if (active) Ui.Slant(r, new Color(1f, 1f, 1f, 0.1f));
-            else if (hover) Ui.Slant(r, new Color(1f, 1f, 1f, 0.06f));
+            if (active) Ui.Slant(r, Ui.Wash(0.1f));
+            else if (hover) Ui.Slant(r, Ui.Wash(0.06f));
             Ui.Slant(new Rect(r.x + 6f, r.y + 7f, 6f, r.height - 14f), active ? Ui.Accent : dot);
             Ui.Text(new Rect(r.x + 22f, r.y, 50f, r.height), lead.ToUpperInvariant(), 12, Ui.Dim, true);
-            Ui.Text(new Rect(r.x + 74f, r.y, r.width - 74f - (tag.Length > 0 ? 48f : 8f), r.height), main, 13, active ? Color.white : Ui.TextC, true);
+            Ui.Text(new Rect(r.x + 74f, r.y, r.width - 74f - (tag.Length > 0 ? 48f : 8f), r.height), main, 13, active ? Ui.Bright : Ui.TextC, true);
             if (tag.Length > 0) Ui.Text(new Rect(r.xMax - 52f, r.y, 44f, r.height), tag.ToUpperInvariant(), 11, hover ? Ui.Accent : Ui.Faint, true, TextAnchor.MiddleRight);
             return GUI.Button(r, GUIContent.none, GUIStyle.none);
         }
