@@ -160,9 +160,16 @@ namespace Streplay
             EnsureWedges();
             float w = Mathf.Min(r.height * lean, r.width * 0.5f);
             if (w < 0.5f) { GUI.DrawTexture(r, Texture2D.whiteTexture, ScaleMode.StretchToFill, true, 0f, c, 0f, 0f); return; }
-            GUI.DrawTexture(new Rect(r.x, r.y, w, r.height), _wedgeL, ScaleMode.StretchToFill, true, 0f, c, 0f, 0f);
+            // On scaled screens the joins fall between pixels, where the pieces' soft edges add up to less than solid and a
+            // dark seam shows. Solid colours get wedges that run one unit under the middle (the clamped texture repeats
+            // their solid inner column); see-through ones don't, as the overlap would show up as a brighter line instead.
+            float o = c.a >= 0.99f && r.width > w * 2f + 2f ? 1f : 0f;
+            var keep = GUI.color;
+            GUI.color = c;
+            GUI.DrawTextureWithTexCoords(new Rect(r.x, r.y, w + o, r.height), _wedgeL, new Rect(0f, 0f, (w + o) / w, 1f), true);
+            GUI.DrawTextureWithTexCoords(new Rect(r.xMax - w - o, r.y, w + o, r.height), _wedgeR, new Rect(-o / w, 0f, (w + o) / w, 1f), true);
+            GUI.color = keep;
             if (r.width > w * 2f) GUI.DrawTexture(new Rect(r.x + w, r.y, r.width - w * 2f, r.height), Texture2D.whiteTexture, ScaleMode.StretchToFill, true, 0f, c, 0f, 0f);
-            GUI.DrawTexture(new Rect(r.xMax - w, r.y, w, r.height), _wedgeR, ScaleMode.StretchToFill, true, 0f, c, 0f, 0f);
         }
 
         static Texture2D _wedgeL, _wedgeR;
