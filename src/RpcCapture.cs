@@ -76,6 +76,14 @@ namespace Streplay
 
         static void Postfix(NetworkBehaviour __instance, object[] __args, MethodBase __originalMethod)
         {
+#if STREPLAY_AUTOTEST
+            Perf.Rpc.Start(); Perf.Rpcs++;
+            try { PostfixInner(__instance, __args, __originalMethod); } finally { Perf.Rpc.Stop(); }
+        }
+
+        static void PostfixInner(NetworkBehaviour __instance, object[] __args, MethodBase __originalMethod)
+        {
+#endif
             var rec = Recorder.Instance;
             if (rec == null || !rec.IsRecording) return;
             try

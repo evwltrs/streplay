@@ -277,7 +277,11 @@ namespace Streplay
             fs.Write(Magic, 0, 4);
             fs.Write(BitConverter.GetBytes(h.Version), 0, 4);
             var deflate = new DeflaterOutputStream(fs, new Deflater(Deflater.BEST_SPEED), 1 << 16);
-            var w = new BinaryWriter(deflate);
+            // The recorder writes thousands of 2-4 byte values per sample; straight into the compressor each one pays
+            // its per-call bookkeeping. Buffered, it compresses 64 KB at a time: same bytes, a fraction of the work.
+            Stream buffered = new BufferedStream(deflate, 1 << 16);
+            Perf.Wrap(ref buffered);
+            var w = new NoGarbageWriter(buffered);
             w.Write(h.GameVersion);
             w.Write(h.PluginVersion);
             w.Write(h.Scene);
@@ -286,6 +290,15 @@ namespace Streplay
             w.Write(h.RoundIndex);
             w.Write(h.SampleRate);
             return w;
+        }
+
+        // Unity's BinaryWriter.Write(float) allocates a small array per call, which at thousands of values per sample
+        // adds up to megabytes of garbage a second; the same four bytes go out through the int overload instead.
+        sealed class NoGarbageWriter : BinaryWriter
+        {
+            public NoGarbageWriter(Stream s) : base(s) { }
+            public override void Write(float value) => base.Write(BitConverter.SingleToInt32Bits(value));
+            public override void Write(double value) => base.Write(BitConverter.DoubleToInt64Bits(value));
         }
 
         public static void Write(this BinaryWriter w, Vector3 v) { w.Write(v.x); w.Write(v.y); w.Write(v.z); }

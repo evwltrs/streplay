@@ -140,6 +140,7 @@ namespace Streplay
 
         public void Bind(ReplayData data, Transform localPlayer)
         {
+            _spriteAssetFor.Clear(); // a kill feed icon mod may have built its sheet since the last replay
             Hide();
             Unbind();
             _data = data;

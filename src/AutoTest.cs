@@ -156,6 +156,7 @@ namespace Streplay
                     return null;
                 }
                 case "seekview": Log(rp.TestSeekView(a.Length > 1 ? F(a[1]) : 0.05f)); return null;
+                case "perf": return PerfRun(F(a[1]), a.Length > 2 ? a[2] : "");
                 case "droparms": Recorder.TestDropArms = true; return null;
                 case "weaponkill":
                 {
@@ -379,6 +380,43 @@ namespace Streplay
         }
 
         static IEnumerator Wait(float s) { yield return new WaitForSecondsRealtime(s); }
+
+        // frame times over a stretch, plus Streplay's own share of them and the GC activity
+        static IEnumerator PerfRun(float secs, string label)
+        {
+            var dts = new System.Collections.Generic.List<float>();
+            Perf.Reset();
+            int gc0 = System.GC.CollectionCount(0);
+            long alloc0 = System.GC.GetAllocatedBytesForCurrentThread();
+            float end = Time.realtimeSinceStartup + secs;
+            long heapGrowth = 0, lastMem = System.GC.GetTotalMemory(false);
+            while (Time.realtimeSinceStartup < end)
+            {
+                yield return null;
+                dts.Add(Time.unscaledDeltaTime * 1000f);
+                long mem = System.GC.GetTotalMemory(false);
+                if (mem > lastMem) heapGrowth += mem - lastMem;
+                lastMem = mem;
+            }
+            int n = dts.Count;
+            float avg = dts.Average();
+            dts.Sort();
+            float p50 = dts[n / 2], p99 = dts[Mathf.Min(n - 1, (int)(n * 0.99f))], max = dts[n - 1];
+            double sampleMs = Perf.Sample.Elapsed.TotalMilliseconds, rpcMs = Perf.Rpc.Elapsed.TotalMilliseconds, guiMs = Perf.Gui.Elapsed.TotalMilliseconds;
+            long alloc = System.GC.GetAllocatedBytesForCurrentThread() - alloc0;
+            Log(System.FormattableString.Invariant($"perf {label}: {n} frames in {secs:0}s, frame avg {avg:0.000} ms (fps {1000f / avg:0}), p50 {p50:0.000}, p99 {p99:0.000} (1% low fps {1000f / p99:0}), max {max:0.0}") +
+                System.FormattableString.Invariant($" | recorder {sampleMs / n:0.0000} ms/frame over {Perf.Samples} samples ({(Perf.Samples > 0 ? sampleMs / Perf.Samples : 0):0.000} ms each)") +
+                System.FormattableString.Invariant($" | rpc hooks {rpcMs / n:0.0000} ms/frame ({Perf.Rpcs} calls) | gui {guiMs / n:0.0000} ms/frame") +
+                System.FormattableString.Invariant($" | gen0 GCs {System.GC.CollectionCount(0) - gc0}, main-thread alloc {alloc / 1024f / secs:0} KB/s") +
+                " | " + (Recorder.Instance != null ? Recorder.Instance.TestTrackedSummary() : ""));
+            if (Perf.Samples > 0)
+            {
+                long raw = Perf.Bytes.Sum();
+                Log("perf " + label + " sections per sample: " + string.Join(", ", Enumerable.Range(0, Perf.Names.Length).Select(i =>
+                    System.FormattableString.Invariant($"{Perf.Names[i]} {Perf.Sec[i].Elapsed.TotalMilliseconds / Perf.Samples:0.000} ms / {Perf.Bytes[i] / Perf.Samples} B / alloc {Perf.Alloc[i] / 1024f / secs:0.0} KB/s"))) +
+                    System.FormattableString.Invariant($" | raw {raw / Perf.Samples} B/sample = {raw / 1024f / secs:0} KB/s before compression | gui alloc {Perf.GuiAlloc / 1024f / secs:0.0} KB/s | heap growth overall {heapGrowth / 1024f / secs:0} KB/s"));
+            }
+        }
 
         static IEnumerator WaitForMenu()
         {

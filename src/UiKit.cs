@@ -45,7 +45,7 @@ namespace Streplay
         static readonly Dictionary<int, GUIStyle> _styles = new Dictionary<int, GUIStyle>();
         static string _tip;
         static Matrix4x4 _oldMatrix;
-        static GUIStyle _oldField, _field;
+        static GUIStyle _field;
 
         public static void Begin()
         {
@@ -57,8 +57,6 @@ namespace Streplay
             H = Screen.height / Scale;
             _tip = null;
             var skin = GUI.skin;
-            _oldField = skin.textField;
-            skin.textField = _field;
             // shared with every other IMGUI mod: changed only while we draw, put back in End
             _oldCursor = skin.settings.cursorColor;
             _oldSelection = skin.settings.selectionColor;
@@ -69,7 +67,6 @@ namespace Streplay
         public static void End()
         {
             if (_tip != null) DrawTip();
-            GUI.skin.textField = _oldField;
             GUI.skin.settings.cursorColor = _oldCursor;
             GUI.skin.settings.selectionColor = _oldSelection;
             GUI.matrix = _oldMatrix;

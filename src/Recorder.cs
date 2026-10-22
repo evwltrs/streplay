@@ -28,8 +28,9 @@ namespace Streplay
         float _nextFlush;
         string _sessionId;
         int _roundIndex;
+        bool _newMatch = true;
         bool _clientWasStarted;
-        float _lastMarkerTime = -10f;
+        readonly Dictionary<string, float> _lastMarker = new Dictionary<string, float>();
         int _take = -1;                 // ScoreManager take index this file started in
 
         // the local player's latest kill, so the marker key can flag it for a few seconds afterwards, even after
@@ -91,20 +92,23 @@ namespace Streplay
         readonly HudCapture _hud = new HudCapture();
         bool _hudFailed;
 
-        void Awake() => Instance = this;
+        void Awake()
+        {
+            Instance = this;
+            useGUILayout = false; // the REC tag and mark notice draw on Repaint only; skips IMGUI's per-frame layout pass and its garbage
+        }
 
         void Update()
         {
             var cm = InstanceFinder.ClientManager;
             bool clientStarted = cm != null && cm.Started;
-            if (clientStarted && !_clientWasStarted)
-            {
-                _sessionId = Guid.NewGuid().ToString("N").Substring(0, 8);
-                _roundIndex = 0;
-            }
+            if (clientStarted && !_clientWasStarted) _newMatch = true;
             _clientWasStarted = clientStarted;
 
             string scene = SceneManager.GetActiveScene().name;
+            // after a match the game goes to the victory screen and back to the menu without dropping the connection;
+            // the next map played is a new match
+            if (scene == "VictoryScene" || scene == "MainMenu") _newMatch = true;
             bool want = Plugin.RecordEnabled.Value && clientStarted && !ReplayPlayer.Active && IsMapScene(scene);
 
             if (IsRecording && (!want || scene != _scene)) Stop();
@@ -130,6 +134,10 @@ namespace Streplay
         static int CurrentTake => ScoreManager.Instance != null ? ScoreManager.Instance.TakeIndex : -1;
 
         int _killFrame = -1;
+
+        internal string TestTrackedSummary() =>
+            $"tracked={_tracked.Count} players={_tracked.Values.Count(t => t.IsPlayer)} bones={_tracked.Values.Sum(t => t.Bones?.Length ?? 0)} " +
+            $"arms={_tracked.Values.Sum(t => t.Vm.Length)} children={_tracked.Values.Sum(t => t.Children.Length)} animators={_tracked.Values.Sum(t => t.Anims.Length)}";
 
         // test hook: the next local player is first recorded without arms, as when it shows up before it's ours
         internal static bool TestDropArms;
@@ -184,7 +192,12 @@ namespace Streplay
             _nextSample = now - _nextSample > step ? now + step : _nextSample + step;
             try
             {
+#if STREPLAY_AUTOTEST
+                Perf.Sample.Start();
+                try { Sample(); } finally { Perf.Sample.Stop(); Perf.Samples++; }
+#else
                 Sample();
+#endif
             }
             catch (Exception e)
             {
@@ -224,7 +237,13 @@ namespace Streplay
         {
             string path = null;
             _torn = false;
-            _lastMarkerTime = -10f; // recording time starts over each round
+            _lastMarker.Clear(); // recording time starts over each round
+            if (_newMatch || _sessionId == null)
+            {
+                _newMatch = false;
+                _sessionId = Guid.NewGuid().ToString("N").Substring(0, 8);
+                _roundIndex = 0;
+            }
             try
             {
                 Directory.CreateDirectory(Plugin.ReplayFolder.Value);
@@ -265,6 +284,7 @@ namespace Streplay
                 _nextSample = _startTime;
                 _tracked.Clear();
                 _sources.Clear();
+                _lastSourceId = 0;
                 _hasView = false;
                 _hud.Reset();
                 _hudFailed = false;
@@ -330,8 +350,10 @@ namespace Streplay
         {
             if (!IsRecording) return null;
             float t = CurrentTime;
-            if (auto && t - _lastMarkerTime < 1f) return null;
-            _lastMarkerTime = t;
+            // automatic markers of one kind can fire twice for the same moment; a kill and a death in the same second
+            // (a trade) are two moments, and so is a quick double kill
+            if (auto && _lastMarker.TryGetValue(label, out float last) && t - last < (label == "Kill" ? 0.15f : 1f)) return null;
+            if (auto) _lastMarker[label] = t;
             _w.Write(Rec.Marker);
             _w.Write(t);
             _w.Write(label);
@@ -356,6 +378,7 @@ namespace Streplay
         {
             var spawned = InstanceFinder.ClientManager.Objects.Spawned;
 
+            Perf.To(0);
             foreach (var kv in spawned)
             {
                 var nob = kv.Value;
@@ -371,6 +394,8 @@ namespace Streplay
                     _w.Write(CurrentTime);
                     _w.Write(nob.ObjectId);
                     Track(nob);
+                    foreach (var ts in _sources.Values)
+                        if (ts.Src != null && TopLevel(ts.Src.GetComponentInParent<NetworkObject>()) == nob) WriteAudioSrc(ts, nob);
                 }
             }
 
@@ -387,6 +412,7 @@ namespace Streplay
                 _w.Write(id);
             }
 
+            Perf.To(1);
             _visual.Clear();
             foreach (var tr in _tracked.Values)
             {
@@ -395,6 +421,7 @@ namespace Streplay
                 if (tr.Visual) _visual.Add(tr);
             }
 
+            Perf.To(2);
             _w.Write(Rec.Frame);
             _w.Write(t);
             var cam = ViewCamera();
@@ -415,8 +442,11 @@ namespace Streplay
             _w.Write((ushort)n);
             for (int i = 0; i < n; i++) WriteState(_visual[i]);
 
+            Perf.To(5);
             SampleAudioSources();
+            Perf.To(6);
             SampleView();
+            Perf.To(7);
 
             if (!_hudFailed)
             {
@@ -434,11 +464,13 @@ namespace Streplay
             }
 
             // sync-flush the compressor now and then so a crash only loses the last couple of seconds
+            Perf.To(8);
             if (Time.unscaledTime >= _nextFlush)
             {
                 _nextFlush = Time.unscaledTime + 2f;
                 _w.Flush();
             }
+            Perf.To(-1);
         }
 
         static Camera ViewCamera()
@@ -528,7 +560,13 @@ namespace Streplay
             _w.Write(client.PlayerName ?? "");
             _w.Write(tr.Nob.IsOwner);
             _w.Write(mat);
-            if (!_meta.Players.Any(p => p.PlayerId == client.PlayerId))
+            var known = _meta.Players.FirstOrDefault(p => p.PlayerId == client.PlayerId);
+            if (known != null && tr.Nob.IsOwner && !known.IsLocal)
+            {
+                known.IsLocal = true; // first seen before the game handed it to us (see Sample)
+                try { _meta.Save(); } catch { /* best effort, saved again on stop */ }
+            }
+            if (known == null)
             {
                 _meta.Players.Add(new ReplayMeta.MetaPlayer
                 {
@@ -571,6 +609,7 @@ namespace Streplay
                 w.Write(pov.rotation);
                 w.Write(HeldId(tr.Pickup != null ? tr.Pickup.objInHand : null));
                 w.Write(HeldId(tr.Pickup != null ? tr.Pickup.objInLeftHand : null));
+                Perf.To(3);
                 w.Write((byte)tr.Vm.Length);
                 if (tr.Vm.Length > 0)
                 {
@@ -583,6 +622,7 @@ namespace Streplay
                         else { w.Write(v.localPosition); w.Write(v.localRotation); }
                     }
                 }
+                Perf.To(4);
                 w.Write((ushort)tr.Bones.Length);
                 for (int i = 0; i < tr.Bones.Length; i++)
                 {
@@ -590,6 +630,7 @@ namespace Streplay
                     w.WriteQuatPacked(b != null ? b.localRotation : Quaternion.identity);
                     if (tr.BoneIsRoot[i]) w.Write(b != null ? b.localPosition : Vector3.zero);
                 }
+                Perf.To(2);
             }
         }
 
@@ -687,6 +728,21 @@ namespace Streplay
 
         // ---------------------------------------------------------------- sounds
 
+        int _lastSourceId;
+
+        // A source is tied to the object it was registered under; a fresh id ties it to whatever object now has that
+        // network id (after a re-track) and its state is written again on the next sample.
+        void WriteAudioSrc(TrackedSource ts, NetworkObject top)
+        {
+            ts.Id = ++_lastSourceId;
+            ts.HasLast = false;
+            _w.Write(Rec.AudioSrc);
+            _w.Write(ts.Id);
+            _w.Write(top.ObjectId);
+            _w.Write(RelPath(top.transform, ts.Src.transform));
+            _w.Write(SourceIndex(ts.Src));
+        }
+
         public void OnSound(AudioSource src, AudioClip clip, float volumeScale, bool fromPlay, bool inRpc)
         {
             if (!IsRecording) return;
@@ -701,13 +757,9 @@ namespace Streplay
                 // state is sampled every frame from now on (see SampleAudioSources)
                 if (!_sources.TryGetValue(src, out var ts))
                 {
-                    ts = new TrackedSource { Id = _sources.Count + 1, Src = src };
+                    ts = new TrackedSource { Src = src };
                     _sources[src] = ts;
-                    _w.Write(Rec.AudioSrc);
-                    _w.Write(ts.Id);
-                    _w.Write(top.ObjectId);
-                    _w.Write(RelPath(top.transform, src.transform));
-                    _w.Write(SourceIndex(src));
+                    WriteAudioSrc(ts, top);
                 }
                 ts.PlayCount++;
                 return;
@@ -823,7 +875,7 @@ namespace Streplay
             if (method == "RpcSendChatLineToAllObservers" && _lastKill != null && _lastKill.Meta == _meta && Time.unscaledTime - _lastKill.At < 2f
                 && _lastKill.Marker.Label == "Kill" && args != null && args.Length > 0 && args[0] is string line)
             {
-                string victim = KillFeedVictim(line);
+                string victim = KillFeedVictim(line, ClientInstance.Instance != null ? ClientInstance.Instance.PlayerId : -1);
                 if (victim != null)
                 {
                     _lastKill.Marker.Label = $"Kill: {victim}";
@@ -839,8 +891,13 @@ namespace Streplay
 
         static readonly System.Text.RegularExpressions.Regex Tags = new System.Text.RegularExpressions.Regex("<[^>]*>");
 
-        static string KillFeedVictim(string line)
+        // the victim of "{victim} was killed with a ... by {killer}", only when the killer is us (another kill line or
+        // our own death can land in the same couple of seconds)
+        static string KillFeedVictim(string line, int localId)
         {
+            var ids = Highlights.Who.Matches(line);
+            if (localId < 0 || ids.Count != 2 || ids[1].Groups[1].Value != localId.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                || ids[0].Groups[1].Value == ids[1].Groups[1].Value) return null;
             string named;
             try { named = ClientInstance.ReplaceAllPlayerNameTags(line); } catch { named = line; } // "{PLAYER_NAME}:{0}" -> name
             string plain = Tags.Replace(named, "").Trim();
@@ -946,6 +1003,15 @@ namespace Streplay
         // REC tag and the marker notice, in the same look as the rest of Streplay's UI
         void OnGUI()
         {
+#if STREPLAY_AUTOTEST
+            Perf.Gui.Start();
+            long mem = System.GC.GetTotalMemory(false);
+            try { OnGUIInner(); } finally { Perf.Gui.Stop(); long d = System.GC.GetTotalMemory(false) - mem; if (d > 0) Perf.GuiAlloc += d; }
+        }
+
+        void OnGUIInner()
+        {
+#endif
             if (ReplayPlayer.Active || Event.current.type != EventType.Repaint) return;
             bool rec = IsRecording && Plugin.ShowRecIndicator.Value;
             float age = Time.unscaledTime - _toastAt;

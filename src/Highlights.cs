@@ -21,7 +21,7 @@ namespace Streplay
         public const int FeaturesVersion = 1;
 
         static readonly Regex Tag = new Regex("<[^>]*>");
-        static readonly Regex Who = new Regex(@"\{PLAYER_NAME\}:\{(\d+)\}");
+        internal static readonly Regex Who = new Regex(@"\{PLAYER_NAME\}:\{(\d+)\}");
 
         // measure a recording (kills, aim, take wins; stored on the meta) and score it
         public static List<ReplayMeta.MetaHighlight> Analyze(ReplayData data, ReplayMeta meta)

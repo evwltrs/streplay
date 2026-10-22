@@ -113,6 +113,8 @@ namespace Streplay
             _phase = Phase.Loading;
             _loadError = null;
             _meta = meta;
+            _v1 = -1f;          // the previous replay's timeline zoom
+            _uiVisible = true;  // and a UI hidden with H there
             yield return null;
 
             try
