@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.1.2
 
 - **STREPLAY no longer starts programs itself.** Starting ffmpeg for renders moved into the STREPLAY FFMPEG package (9.0.3), and the Folder buttons open the folder through the game instead of starting Explorer, so the main package has no process-launching code. Renders to MP4/MOV need STREPLAY FFMPEG 9.0.3 or later, also when you use your own ffmpeg; without it, renders are PNG frames as before.
 
