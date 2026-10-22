@@ -147,6 +147,7 @@ namespace Streplay
             if (data.Ui.Count == 0) return;
             var ddolRoots = Net.DdolScene().GetRootGameObjects();
             int missing = 0, created = 0;
+            var missingPaths = new List<string>();
             foreach (var el in data.Ui.Values)
             {
                 // TMP's own sub-mesh for sprites/fallback fonts: the rebuilt text makes its own, and rebuilt as an
@@ -157,6 +158,10 @@ namespace Streplay
                 if (el.Path.IndexOf("/VoiceChatIndicator/", StringComparison.Ordinal) >= 0) continue;
                 // and your own "transmitting voice" note, bottom right
                 if (el.Path.IndexOf("--PopupWriting--/VoiceText", StringComparison.Ordinal) >= 0) continue;
+                // fades of spawned pieces (a kill feed line's CanvasGroup): the rebuilt pieces take them from the recording
+                // (LinkGroups). Bound by path they'd drive whatever copy the live game has left over, or, right after
+                // launching the game when it has none, just count as not found.
+                if (el.Kind == UiKind.Group && el.Path.IndexOf("(Clone)", StringComparison.Ordinal) >= 0) continue;
                 if (el.Dynamic)
                 {
                     var made = Create(el, localPlayer, ddolRoots);
@@ -167,7 +172,7 @@ namespace Streplay
                 var t = Resolve(el.Anchor, el.Path, localPlayer, ddolRoots);
                 Component c = null;
                 if (t != null) c = el.Kind == UiKind.Group ? (Component)t.GetComponent<CanvasGroup>() : t.GetComponent<Graphic>();
-                if (c == null) { missing++; continue; }
+                if (c == null) { missing++; if (missingPaths.Count < 60) missingPaths.Add(el.Path); continue; }
                 _bound.Add(new Bound { Info = el, C = c });
             }
             foreach (var b in _bound) b.Part = PartOf(b.Info.Path);
@@ -188,6 +193,7 @@ namespace Streplay
             }
             Plugin.Log.LogDebug($"HUD: {_bound.Count} elements bound ({created} rebuilt)" + (missing > 0 ? $", {missing} not found" : "") +
                                (_logBirths.Count > 0 ? $", {_logBirths.Count} kill feed lines restacked" : ""));
+            if (missingPaths.Count > 0) Plugin.Log.LogDebug("HUD not found: " + string.Join(" | ", missingPaths.Distinct()));
         }
 
         static Transform Resolve(byte anchor, string path, Transform localPlayer, GameObject[] ddolRoots)
