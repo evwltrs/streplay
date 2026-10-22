@@ -168,6 +168,8 @@ namespace Streplay
                 foreach (var name in ExcludedPauseFields)
                     if (HarmonyLib.AccessTools.Field(typeof(PauseManager), name)?.GetValue(pm) is GameObject go && go != null)
                         _excluded.Add(go);
+            // the proximity voice chat's "who's talking" tags (voice itself isn't recorded either)
+            if (VoiceChatUI.Instance != null) _excluded.Add(VoiceChatUI.Instance.gameObject);
 
             var ddol = Net.DdolScene();
             if (ddol.IsValid())

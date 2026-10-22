@@ -152,6 +152,9 @@ namespace Streplay
                 // TMP's own sub-mesh for sprites/fallback fonts: the rebuilt text makes its own, and rebuilt as an
                 // Image it would be a white box (kill feed icon mods)
                 if (IsTmpSubMesh(el.Path)) continue;
+                // the proximity voice chat's "who's talking" tags: not part of the moment (voice isn't recorded), and
+                // rebuilt they lose their background and show as a white box (recordings made before the recorder skipped them)
+                if (el.Path.IndexOf("/VoiceChatIndicator/", StringComparison.Ordinal) >= 0) continue;
                 if (el.Dynamic)
                 {
                     var made = Create(el, localPlayer, ddolRoots);
