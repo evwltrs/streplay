@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.1.1
 
 - **Weapons standing on spawners** (the Nizeh, the Katana and others with their own animation) stand upright in replays, like in game, instead of lying tipped over. Replays now apply the weapons' and players' recorded animation settings, which they had been missing; recordings made before this are fixed too.
 - **Sliding in My view:** your torso and legs show while you slide, like in game (in any player's POV too).
