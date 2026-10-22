@@ -14,8 +14,8 @@ if ($banner -notmatch "ffmpeg version $([regex]::Escape($ver))") { throw "ffmpeg
 $stage = Join-Path $root 'obj\ffmpeg-package'
 if (Test-Path $stage) { Remove-Item -Recurse -Force $stage }
 New-Item -ItemType Directory -Force $stage | Out-Null
-Copy-Item (Join-Path $src 'manifest.json'), (Join-Path $src 'README.md'), (Join-Path $src 'CHANGELOG.md'), (Join-Path $src 'LICENSE.txt') $stage
-& (Join-Path $PSScriptRoot 'make-icon.ps1') -Label 'FFMPEG' -Out (Join-Path $stage 'icon.png') | Out-Null
+# icon.png comes from the logo (tools/make-icons.py)
+Copy-Item (Join-Path $src 'manifest.json'), (Join-Path $src 'README.md'), (Join-Path $src 'CHANGELOG.md'), (Join-Path $src 'LICENSE.txt'), (Join-Path $src 'icon.png') $stage
 Copy-Item $Ffmpeg (Join-Path $stage 'ffmpeg.exe')
 
 $dist = Join-Path $root 'dist'

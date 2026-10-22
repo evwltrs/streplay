@@ -25,7 +25,7 @@ Streplay only records what your own game already shows you. It is marked as vani
 
 Install with a mod manager: **r2modman** or the Thunderstore Mod Manager. BepInEx is installed for you. Start the game with **Start modded**.
 
-To render straight to **video** files (MP4/MOV), also install **1nf-StreplayFFmpeg**, which contains ffmpeg. Streplay finds it automatically. If you already have ffmpeg, you can use that instead: put `ffmpeg.exe` in `Documents\Streplay\ffmpeg\` or on your PATH, or set `FfmpegPath` in the config.
+To render straight to **video** files (MP4/MOV), also install **1nf-StreplayFFmpeg**, which contains ffmpeg. Streplay finds it automatically. If you already have ffmpeg, you can use that instead: put `ffmpeg.exe` in an `ffmpeg` folder inside your replay folder, or on your PATH, or set `FfmpegPath` in the config.
 
 Without ffmpeg, renders are saved as PNG frames plus a `.wav` file, which any video editor can import.
 
@@ -34,7 +34,7 @@ Without ffmpeg, renders are saved as PNG frames plus a `.wav` file, which any vi
 1. Play. Every round is recorded. Press **F8** for anything worth keeping.
 2. On the main menu, click **Replays** (or press **F10**). Pick a round and **Watch**, click a marker, or open the **Highlights** tab.
 3. Set the clip with **I** / **O** (or **C** for 2.5 s either side of now). Press **R**, pick the size, frame rate and blur, then **Start render**.
-4. Renders are saved in `Documents\Streplay\renders`. **Esc** cancels a render and keeps what was rendered so far.
+4. Renders are saved in the `renders` folder inside your replay folder. **Esc** cancels a render and keeps what was rendered so far.
 
 ### Shortcuts while watching
 
