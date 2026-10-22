@@ -18,7 +18,7 @@ You need the [.NET SDK](https://dotnet.microsoft.com/download) (8 or newer) and 
 
    This writes `dist\1nf-STREPLAY-<version>.zip`. The version in `thunderstore/manifest.json` and `src/Plugin.cs` must match, or it stops.
 
-The optional ffmpeg add-on is packed with `powershell -File tools\pack-ffmpeg.ps1 -Ffmpeg <path to ffmpeg.exe>`. The icons are made from `docs/brand/streplay-logo.png` with `python tools/make-icons.py`.
+The optional ffmpeg add-on is packed with `powershell -File tools\pack-ffmpeg.ps1 -Ffmpeg <path to ffmpeg.exe>`. It holds ffmpeg.exe and `StreplayFfmpeg.dll` (`ffmpeg-package/bridge`), the only code that starts processes: STREPLAY links against it but never ships it, so the main package has nothing that launches programs (that's what kept sending it to Thunderstore's manual review). The add-on's version is its own; the FFmpeg version is the one named in `ffmpeg-package/README.md`. The icons are made from `docs/brand/streplay-logo.png` with `python tools/make-icons.py`.
 
 Debug builds also include a scripted test harness (`src/AutoTest.cs`), which never goes into release packages.
 

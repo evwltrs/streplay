@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
@@ -114,9 +114,8 @@ namespace Streplay
 
     internal sealed class FfmpegSink : FrameSink
     {
-        readonly Process _proc;
+        readonly object _enc; // the STREPLAY_FFMPEG package's encoder (see FfmpegBridge)
         readonly Stream _stdin;
-        readonly Queue<string> _log = new Queue<string>();
         readonly string _audio;
 
         public static string Extension(RenderFormat f) => f == RenderFormat.ProRes4444 ? ".mov" : ".mp4";
@@ -148,51 +147,60 @@ namespace Streplay
                           $"{codec} -colorspace bt709 -color_primaries bt709 -color_trc bt709 " +
                           (format == RenderFormat.ProRes4444 ? "" : "-movflags +faststart ") + $"\"{output}\"";
             Plugin.Log.LogDebug($"[render] {ffmpeg} {args}");
-            _proc = Run(ffmpeg, args, true);
-            _stdin = _proc.StandardInput.BaseStream;
+            _enc = FfmpegBridge.Start(ffmpeg, args);
+            _stdin = FfmpegBridge.Input(_enc);
             StartWorkers(1); // one writer keeps frames in order
         }
 
-        Process Run(string exe, string args, bool stdin)
-        {
-            var p = new Process
-            {
-                StartInfo = new ProcessStartInfo(exe, args)
-                {
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                    RedirectStandardInput = stdin,
-                    RedirectStandardError = true,
-                    RedirectStandardOutput = true,
-                }
-            };
-            // ffmpeg blocks once its stderr pipe is full, so it's always drained
-            p.ErrorDataReceived += (_, e) => { if (e.Data != null) lock (_log) { _log.Enqueue(e.Data); while (_log.Count > 20) _log.Dequeue(); } };
-            p.OutputDataReceived += (_, e) => { };
-            p.Start();
-            p.BeginErrorReadLine();
-            p.BeginOutputReadLine();
-            _exe = exe;
-            return p;
-        }
-
-        string _exe;
-
         protected override void Write(byte[] rgba, int index)
         {
-            if (_proc.HasExited) throw new IOException("ffmpeg stopped: " + LastLog());
+            if (FfmpegBridge.HasExited(_enc)) throw new IOException("ffmpeg stopped: " + FfmpegBridge.LastLog(_enc));
             _stdin.Write(rgba, 0, rgba.Length);
         }
 
-        string LastLog() { lock (_log) return string.Join(" | ", _log); }
-
         protected override void Close(bool cancelled)
         {
-            try { _stdin.Flush(); _stdin.Close(); } catch (IOException) { }
-            _proc.WaitForExit();
-            if (_proc.ExitCode != 0) throw new IOException($"ffmpeg exit code {_proc.ExitCode}: {LastLog()}");
-            Plugin.Log.LogDebug($"[render] ffmpeg finished {OutputPath}" + (LastLog().Length > 0 ? $" ({LastLog()})" : ""));
+            int code = FfmpegBridge.Finish(_enc);
+            string log = FfmpegBridge.LastLog(_enc);
+            if (code != 0) throw new IOException($"ffmpeg exit code {code}: {log}");
+            Plugin.Log.LogDebug($"[render] ffmpeg finished {OutputPath}" + (log.Length > 0 ? $" ({log})" : ""));
             if (!cancelled && _audio != null) try { File.Delete(_audio); } catch (IOException) { }
+        }
+    }
+
+    // STREPLAY starts no programs itself: ffmpeg is started by StreplayFfmpeg.dll, which comes with the STREPLAY_FFMPEG
+    // package. Only the methods here name its types, and none of them is compiled
+    // until it's called, so without the package nothing here loads and STREPLAY carries on with PNG frames.
+    internal static class FfmpegBridge
+    {
+        static bool? _installed;
+
+        public static bool Installed
+        {
+            get
+            {
+                if (_installed == null)
+                {
+                    try { _installed = BridgeVersion() >= 1; }
+                    catch (Exception) { _installed = false; } // FileNotFoundException / TypeLoadException: not installed
+                    Plugin.Log.LogInfo(_installed == true ? "STREPLAY_FFMPEG found: renders go to video files" : "STREPLAY_FFMPEG not installed: renders are PNG frames");
+                }
+                return _installed == true;
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)] static int BridgeVersion() => StreplayFfmpeg.Bridge.Version;
+        [MethodImpl(MethodImplOptions.NoInlining)] public static object Start(string exe, string args) => new StreplayFfmpeg.Encoder(exe, args);
+        [MethodImpl(MethodImplOptions.NoInlining)] public static Stream Input(object e) => ((StreplayFfmpeg.Encoder)e).Input;
+        [MethodImpl(MethodImplOptions.NoInlining)] public static bool HasExited(object e) => ((StreplayFfmpeg.Encoder)e).HasExited;
+        [MethodImpl(MethodImplOptions.NoInlining)] public static string LastLog(object e) => ((StreplayFfmpeg.Encoder)e).LastLog;
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static int Finish(object e)
+        {
+            var enc = (StreplayFfmpeg.Encoder)e;
+            try { return enc.Finish(); }
+            finally { enc.Dispose(); }
         }
     }
 
@@ -200,9 +208,11 @@ namespace Streplay
     {
         public static string DropFolder => Path.Combine(Plugin.ReplayFolder.Value, "ffmpeg");
 
-        // Configured path (file or folder), <ReplayFolder>\ffmpeg (or its bin\), the plugin folder, then PATH.
+        // Configured path (file or folder), <ReplayFolder>\ffmpeg (or its bin\), the plugin folder, then PATH. Any of
+        // them needs the STREPLAY_FFMPEG package installed, which is what runs it (FfmpegBridge).
         public static string Find()
         {
+            if (!FfmpegBridge.Installed) return null;
             var candidates = new List<string>();
             string cfg = Plugin.FfmpegPath.Value?.Trim().Trim('"');
             // a malformed setting or PATH entry (stray quotes, <>|) is skipped rather than thrown: this runs from the GUI
@@ -256,8 +266,9 @@ namespace Streplay
             }
         }
 
-        public static string NotFoundMessage =>
-            "ffmpeg not found, so renders are PNG frames. For MP4/MOV: download a Windows build (gyan.dev → ffmpeg-release-essentials.zip), " +
-            $"and put ffmpeg.exe in {DropFolder} (or set Render.FfmpegPath).";
+        public static string NotFoundMessage => !FfmpegBridge.Installed
+            ? "Renders are PNG frames. For MP4/MOV, install the STREPLAY_FFMPEG package (it has ffmpeg and what STREPLAY needs to run it)."
+            : "ffmpeg not found, so renders are PNG frames. Reinstall STREPLAY_FFMPEG, or put ffmpeg.exe in " +
+              $"{DropFolder} (or set Render.FfmpegPath).";
     }
 }

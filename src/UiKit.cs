@@ -74,13 +74,13 @@ namespace Streplay
 
         static Color _oldCursor, _oldSelection;
 
-        // Explorer handles any folder name (OpenURL with file:/// breaks on # or %)
+        // the folder's file:/// URL, escaped so # and % in its name survive
         public static void OpenFolder(string path)
         {
             try
             {
                 System.IO.Directory.CreateDirectory(path);
-                System.Diagnostics.Process.Start("explorer.exe", "\"" + path + "\"");
+                Application.OpenURL(new System.Uri(System.IO.Path.GetFullPath(path)).AbsoluteUri);
             }
             catch (System.Exception e) { Plugin.Log.LogWarning($"Could not open {path}: {e.Message}"); }
         }

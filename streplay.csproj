@@ -31,6 +31,12 @@
     <Compile Remove="src/AutoTest.cs" />
   </ItemGroup>
 
+  <!-- the STREPLAY_FFMPEG package's StreplayFfmpeg.dll: its own project, linked against but never shipped here -->
+  <ItemGroup>
+    <Compile Remove="ffmpeg-package/**" />
+    <ProjectReference Include="ffmpeg-package\bridge\StreplayFfmpeg.csproj" Private="false" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="BepInEx.Core" Version="5.4.21" PrivateAssets="all" />
     <PackageReference Include="BepInEx.PluginInfoProps" Version="2.*" PrivateAssets="all" />

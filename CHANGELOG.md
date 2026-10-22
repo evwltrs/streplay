@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **STREPLAY no longer starts programs itself.** Starting ffmpeg for renders moved into the STREPLAY FFMPEG package (9.0.3), and the Folder buttons open the folder through the game instead of starting Explorer, so the main package has no process-launching code. Renders to MP4/MOV need STREPLAY FFMPEG 9.0.3 or later, also when you use your own ffmpeg; without it, renders are PNG frames as before.
+
 ## 1.1.1
 
 - **Weapons standing on spawners** (the Nizeh, the Katana and others with their own animation) stand upright in replays, like in game, instead of lying tipped over. Replays now apply the weapons' and players' recorded animation settings, which they had been missing; recordings made before this are fixed too.

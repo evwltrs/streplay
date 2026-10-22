@@ -34,6 +34,7 @@ namespace Streplay
     //   rendercancel             cancel the running render, like Esc
     //   renderpanel on|off       show the render settings panel
     //   ffmpegpath <path>|none   set Render.FfmpegPath
+    //   openfolder <path>        what the Folder buttons do, for that folder (created if missing)
     //   highlights [n]           wait for the highlight scan, log the top n across all matches
     //   hltab [all]              show the browser's Highlights tab (latest match, or all)
     //   hlwatch <n>              open the n-th best highlight (all matches) like the browser's Watch button
@@ -321,6 +322,7 @@ namespace Streplay
                 case "renderasync": { var r = Render(rp, a); StartCoroutine(r); return null; }
                 case "rendercancel": rp.TestCancelRender(); return null;
                 case "renderpanel": rp.TestRenderPanel(a[1] == "on"); return null;
+                case "openfolder": Ui.OpenFolder(string.Join(" ", a.Skip(1))); return null;
                 case "ffmpegpath": Plugin.FfmpegPath.Value = a.Length > 1 && a[1] != "none" ? string.Join(" ", a.Skip(1)) : ""; Log($"ffmpeg: {Ffmpeg.Find() ?? "not found"}"); return null;
                 case "localsound": LocalSound(a[1], a.Length > 2 ? a[2] : ""); return null;
                 default: Log("unknown command"); return null;
