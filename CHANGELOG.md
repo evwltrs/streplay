@@ -1,10 +1,14 @@
 # Changelog
 
-## Unreleased
+## 1.1.0
 
-- **Player outlines** in replays and renders, on or off (Settings tab and the render panel). They use your outline colours and width from the game's settings: team colour for you, enemy colour for everyone else.
-- **Viewmodel: Default or Kestrel.** Kestrel shows your first-person arms and weapon the way Kestrel's Minimal Viewmodels Reborn is set up (offset, FOV, mirrored, hidden arms or weapon), in My view and in renders. Without that mod installed, replays keep the default viewmodel.
-- **My view closer to the game:** your first-person hands show again (they were switched off with the rest of what other players don't see), and the weapon in your hands is drawn by the viewmodel camera like in game, at the viewmodel FOV and without clipping into walls.
+- **Player outlines:** turn outlines around players on or off in replays and renders (Settings tab and the render panel). They use your outline colours and width from the game's settings: the team colour for you, the enemy colour for everyone else.
+- **Viewmodel: Default or Kestrel.** Kestrel shows your first-person arms and weapon the way Kestrel's Minimal Viewmodels Reborn is set up (offset, FOV, mirrored, hidden arms or weapon), in My view and in renders. Changes made in game with Mod Menu show up right away. Without that mod installed, replays keep the default viewmodel.
+- **My view closer to the game:**
+  - Your first-person hands show. They were switched off along with the rest of what other players don't see.
+  - The weapon in your hands is drawn by the viewmodel camera, like in game: at the viewmodel FOV, and it no longer clips into walls.
+- **Voice chat kept out of replays:** the "who's talking" tags and your own "transmitting voice" note are no longer recorded. Recordings made with 1.0.0, where they showed up as a white box, skip them too.
+- **Kill feed:** replays show the same kill feed whether you just launched the game or just finished a match. Kill feed lines left over from the live game no longer fade along with the replay.
 
 ## 1.0.0
 
