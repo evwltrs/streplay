@@ -385,6 +385,7 @@ namespace Streplay
                 bool fp = local != null && local.VmShown;
                 _cam.cullingMask = fp ? _maskFirstPerson : _maskWorld;
                 foreach (var c in _vmCams) if (c != null) c.enabled = fp;
+                UpdateViewmodelItems(fp && _vmCams.Count > 0 ? local : null);
             }
 
             // the game's own HUD, as it was on screen, whenever we look through the recording player's eyes
@@ -406,7 +407,114 @@ namespace Streplay
             var view = ViewAt(_curFrameIndex);
             _postFx.Apply(me != null && IsViewTarget(me), view);
             if (view.HasValue && view.Value.VmFov > 1f && _vmCams.Count > 0 && _vmCams[0] != null) _vmCams[0].fieldOfView = view.Value.VmFov;
+            ApplyViewmodelStyle(me);
+
+            if (_outlines != Plugin.PlayerOutlines.Value)
+            {
+                _outlines = Plugin.PlayerOutlines.Value;
+                foreach (var p in _puppets)
+                    if (p != null && p.Owned && p.Info.IsPlayer) PuppetFactory.ApplyOutline(p, _outlines);
+            }
         }
+
+        bool _outlines;
+        Camera _weaponCam;   // the overlay copied from the player's weapon camera (cameras[1]), the one Kestrel's mod changes
+        float _weaponNear, _weaponFar;
+        bool _styled;
+        Camera _mirrored;    // drawn with GL.invertCulling while it renders, so a mirrored projection keeps its front faces
+        readonly List<Renderer> _hiddenArms = new List<Renderer>();
+        Puppet _armsOf;
+        static readonly System.Reflection.FieldInfo F_FpArms = HarmonyLib.AccessTools.Field(typeof(PlayerSetup), "fpArms");
+
+        // The Kestrel viewmodel option: what Minimal Viewmodels Reborn does to the live weapon camera, done to the replay's
+        // copy of it. The offset moves the camera (the arms are recorded where the game put them), the FOV and mirroring
+        // are its own projection (the recorded viewmodel FOV doesn't apply, as in game), and the arms or the whole weapon
+        // camera can be hidden. Sway and bob are already in the recorded arms. Default puts the camera back as it was.
+        void ApplyViewmodelStyle(Puppet me)
+        {
+            var c = _weaponCam;
+            if (c == null) return;
+            if (Plugin.Viewmodel.Value != ViewmodelStyle.Kestrel || !KestrelViewmodels.TryGet(out var k)) { ClearViewmodelStyle(); return; }
+            _styled = true;
+            c.transform.localPosition = -k.Offset;
+            c.fieldOfView = k.Fov;
+            c.nearClipPlane = 0.1f;
+            c.farClipPlane = 100f;
+            c.ResetProjectionMatrix();
+            if (k.Mirror) c.projectionMatrix *= Matrix4x4.Scale(new Vector3(-1f, 1f, 1f));
+            SetMirrored(k.Mirror ? c : null);
+            if (k.HideWeapon) c.enabled = false;
+            SetArmsHidden(me, k.HideArms);
+        }
+
+        void ClearViewmodelStyle()
+        {
+            SetMirrored(null);
+            SetArmsHidden(null, false);
+            if (!_styled) return;
+            _styled = false;
+            var c = _weaponCam;
+            if (c == null) return;
+            c.transform.localPosition = Vector3.zero;
+            c.nearClipPlane = _weaponNear;
+            c.farClipPlane = _weaponFar;
+            c.ResetProjectionMatrix();
+        }
+
+        void SetArmsHidden(Puppet me, bool hide)
+        {
+            if (!hide) me = null;
+            if (me == _armsOf) return;
+            foreach (var r in _hiddenArms) if (r != null) r.enabled = true;
+            _hiddenArms.Clear();
+            _armsOf = me;
+            if (me == null || !(F_FpArms?.GetValue(me.Go.GetComponent<PlayerSetup>()) is GameObject[] gos)) return;
+            foreach (var go in gos)
+                if (go != null && go.GetComponent<SkinnedMeshRenderer>() is SkinnedMeshRenderer r) { r.enabled = false; _hiddenArms.Add(r); }
+        }
+
+        // In first person the game draws the weapons in your hands with the weapon camera: picking one up puts it on the
+        // viewmodel layer (ItemBehaviour.SetLayer), dropping it puts it back (UnsetLayer). The same here while we look
+        // through the recording player's eyes, so held weapons get the viewmodel FOV (and Kestrel's settings) and don't
+        // clip into walls.
+        readonly List<Puppet> _vmItems = new List<Puppet>();
+
+        void UpdateViewmodelItems(Puppet holder)
+        {
+            Puppet right = holder != null ? HeldItem(holder.HeldRight) : null, left = holder != null ? HeldItem(holder.HeldLeft) : null;
+            for (int i = _vmItems.Count - 1; i >= 0; i--)
+            {
+                if (_vmItems[i] == right || _vmItems[i] == left) continue;
+                SetItemLayer(_vmItems[i], 0);
+                _vmItems.RemoveAt(i);
+            }
+            if (right != null && !_vmItems.Contains(right)) { SetItemLayer(right, 8); _vmItems.Add(right); }
+            if (left != null && !_vmItems.Contains(left)) { SetItemLayer(left, 8); _vmItems.Add(left); }
+        }
+
+        Puppet HeldItem(int idx) => idx >= 0 && idx < _puppets.Length && _puppets[idx]?.Go != null && _puppets[idx].Owned ? _puppets[idx] : null;
+
+        // like ItemBehaviour.SetLayerAllChildren, which stops at the first effect (muzzle flash, scope) so those keep their layers
+        static void SetItemLayer(Puppet item, int layer)
+        {
+            if (item.Go == null) return;
+            foreach (var t in item.Go.GetComponentsInChildren<Transform>(true))
+            {
+                if (t.tag == "vfx") break;
+                t.gameObject.layer = layer;
+            }
+        }
+
+        void SetMirrored(Camera c)
+        {
+            if (c == _mirrored) return;
+            if (_mirrored == null) { Camera.onPreRender += MirrorPre; Camera.onPostRender += MirrorPost; }
+            _mirrored = c;
+            if (c == null) { Camera.onPreRender -= MirrorPre; Camera.onPostRender -= MirrorPost; GL.invertCulling = false; }
+        }
+
+        void MirrorPre(Camera c) { if (c == _mirrored) GL.invertCulling = true; }
+        void MirrorPost(Camera c) { if (c == _mirrored) GL.invertCulling = false; }
 
         static void ApplyBones(Puppet p)
         {
@@ -431,8 +539,10 @@ namespace Streplay
             if (!p.VmShown)
             {
                 p.VmShown = true;
-                for (var t = root; t != null && t != p.Go.transform.parent; t = t.parent)
-                    if (!t.gameObject.activeSelf) { t.gameObject.SetActive(true); p.VmActivated.Add(t.gameObject); }
+                Activate(p, root);
+                // the arm meshes too: a puppet is set up the way other players see it, which switches off what's above them
+                if (F_FpArms?.GetValue(p.Go.GetComponent<PlayerSetup>()) is GameObject[] arms)
+                    foreach (var go in arms) if (go != null) Activate(p, go.transform);
                 foreach (var d in p.VmDrivers) if (d != null) d.enabled = false;
             }
             var s = p.CurS;
@@ -448,6 +558,13 @@ namespace Streplay
                 if (i == 0) t.SetPositionAndRotation(pos, rot);
                 else { t.localPosition = pos; t.localRotation = rot; }
             }
+        }
+
+        // t and everything above it up to the puppet, remembering what was off so HideViewmodel can put it back
+        static void Activate(Puppet p, Transform t)
+        {
+            for (; t != null && t != p.Go.transform.parent; t = t.parent)
+                if (!t.gameObject.activeSelf) { t.gameObject.SetActive(true); p.VmActivated.Add(t.gameObject); }
         }
 
         void HideViewmodel(Puppet p)

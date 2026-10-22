@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- **Player outlines** in replays and renders, on or off (Settings tab and the render panel). They use your outline colours and width from the game's settings: team colour for you, enemy colour for everyone else.
+- **Viewmodel: Default or Kestrel.** Kestrel shows your first-person arms and weapon the way Kestrel's Minimal Viewmodels Reborn is set up (offset, FOV, mirrored, hidden arms or weapon), in My view and in renders. Without that mod installed, replays keep the default viewmodel.
+- **My view closer to the game:** your first-person hands show again (they were switched off with the rest of what other players don't see), and the weapon in your hands is drawn by the viewmodel camera like in game, at the viewmodel FOV and without clipping into walls.
+
 ## 1.0.0
 
 First public release.

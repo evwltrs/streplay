@@ -237,6 +237,38 @@ namespace Streplay
             if (LoggedCosmetics.Add(line)) Plugin.Log.LogDebug(line); // once per player, not per life
         }
 
+        static readonly FieldInfo F_DisableForMe = AccessTools.Field(typeof(PlayerSetup), "gameObjectsToDisableForMe");
+        static readonly int P_OutlineWidth = Shader.PropertyToID("_ASEOutlineWidth");
+        static readonly int P_OutlineColor = Shader.PropertyToID("_ASEOutlineColor");
+        static MaterialPropertyBlock _block;
+
+        // Player outlines, the way PlayerSetup's dress RPC draws them: a line in the player's outline colour around
+        // the body (thinner around the head), sized by the outline width setting. Recordings don't keep teams, so the
+        // recording player gets the team colour and everyone else the enemy colour (right for 1v1 and free-for-all).
+        // Off sets the width to 0, which is how a player without outlines looks.
+        internal static void ApplyOutline(Puppet p, bool on)
+        {
+            var setup = p.Go != null ? p.Go.GetComponent<PlayerSetup>() : null;
+            if (setup == null || !(F_DisableForMe?.GetValue(setup) is GameObject[] parts)) return;
+            float mult = PlayerPrefs.HasKey("OutlineWidthMultiplier")
+                ? Mathf.Clamp01(PlayerPrefs.GetFloat("OutlineWidthMultiplier")) : OutlineHandler.OutlineWidthMultiplier;
+            var color = p.IsLocalPlayer ? PrefColor("TeamOutlineColor", OutlineHandler.TeamColor) : PrefColor("EnemyOutlineColor", OutlineHandler.EnemyColor);
+            _block ??= new MaterialPropertyBlock();
+            foreach (var go in parts)
+            {
+                var smr = go != null ? go.GetComponent<SkinnedMeshRenderer>() : null;
+                if (smr == null) continue;
+                smr.GetPropertyBlock(_block, 0);
+                _block.SetFloat(P_OutlineWidth, on ? (go.name == "SM_Aboubi_Head00" ? 0.02f : 0.04f) * mult : 0f);
+                _block.SetColor(P_OutlineColor, color);
+                smr.SetPropertyBlock(_block, 0);
+            }
+        }
+
+        // OutlineHandler only loads the player's colours when the settings menu first opens, so read them like it does
+        static Color PrefColor(string key, Color fallback) =>
+            PlayerPrefs.HasKey(key) && ColorUtility.TryParseHtmlString("#" + PlayerPrefs.GetString(key), out var c) ? c : fallback;
+
         internal static GameObject Wear(GameObject prefab, Transform anchor, int layer)
         {
             var go = UnityEngine.Object.Instantiate(prefab, anchor, false);

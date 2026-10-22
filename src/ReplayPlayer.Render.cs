@@ -826,7 +826,7 @@ namespace Streplay
 
         void DrawRenderPanel()
         {
-            float w = 660f, h = 676f + ((HudReplay.Parts.Length + 3) / 4 - 2) * 32f;
+            float w = 660f, h = 748f + ((HudReplay.Parts.Length + 3) / 4 - 2) * 32f;
             var p = new Rect(16f, Ui.H - 150f - 16f - 12f - h, w, h);
             if (p.y < 12f) { h += p.y - 12f; p = new Rect(p.x, 12f, w, h); }
             Claim(p);
@@ -949,6 +949,21 @@ namespace Streplay
                 if (Ui.Chip(cr, HudReplay.Parts[i].label, e.Value, e.Value ? "Shown: click to hide it in My view and renders" : "Hidden: click to show it")) e.Value = !e.Value;
             }
             y += (HudReplay.Parts.Length + 3) / 4 * 32f + gap;
+
+            Label("Outlines");
+            int ol = Ui.Segmented(new Rect(cx, y, 140f, rh), new[] { "Off", "On" }, Plugin.PlayerOutlines.Value ? 1 : 0);
+            Plugin.PlayerOutlines.Value = ol == 1;
+            Ui.Text(new Rect(cx + 152f, y, 300f, rh), "around players, in your outline colours", 11, Ui.Faint);
+            y += rh + gap;
+
+            Label("Viewmodel");
+            bool kestrel = KestrelViewmodels.Installed;
+            GUI.enabled = kestrel;
+            int vm = Ui.Segmented(new Rect(cx, y, 200f, rh), new[] { "Default", "Kestrel" }, kestrel && Plugin.Viewmodel.Value == ViewmodelStyle.Kestrel ? 1 : 0);
+            GUI.enabled = true;
+            if (kestrel) Plugin.Viewmodel.Value = vm == 1 ? ViewmodelStyle.Kestrel : ViewmodelStyle.Default;
+            Ui.Text(new Rect(cx + 212f, y, 300f, rh), kestrel ? "Kestrel: as set in Minimal Viewmodels Reborn" : "Kestrel needs Minimal Viewmodels Reborn", 11, Ui.Faint);
+            y += rh + gap;
 
             Label("Folder");
             string folder = Ui.Field(new Rect(cx, y, w - 160f, rh), Plugin.RenderFolder.Value);

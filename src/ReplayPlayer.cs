@@ -229,6 +229,8 @@ namespace Streplay
             Plugin.Log.LogInfo($"Replay closed, {_audio.Stats}");
             _audio.Dispose();
             _postFx.Dispose();
+            ClearViewmodelStyle();
+            _vmItems.Clear();
             foreach (var p in _puppets)
                 if (p != null && p.Owned && p.Go != null) Destroy(p.Go);
             _puppets = Array.Empty<Puppet>();
@@ -348,10 +350,13 @@ namespace Streplay
                 {
                     try { PuppetFactory.ApplyCosmetics(p); }
                     catch (Exception e) { Plugin.Log.LogWarning($"Cosmetics failed for {info.Name}: {e.Message}"); }
+                    try { PuppetFactory.ApplyOutline(p, Plugin.PlayerOutlines.Value); }
+                    catch (Exception e) { Plugin.Log.LogWarning($"Outline failed for {info.Name}: {e.Message}"); }
                 }
                 _puppets[info.Index] = p;
                 made++;
             }
+            _outlines = Plugin.PlayerOutlines.Value;
             if (missing > 0) Plugin.Log.LogWarning($"{missing} recorded objects have no matching prefab/scene object and will be skipped");
             Plugin.Log.LogDebug($"Created {made} replay objects");
 
@@ -397,6 +402,8 @@ namespace Streplay
         void BuildViewmodelCameras()
         {
             _vmCams.Clear();
+            _weaponCam = null;
+            _styled = false;
             var local = _puppets.FirstOrDefault(p => p != null && p.IsLocalPlayer && p.Vm.Length > 0);
             var setup = local != null ? local.Go.GetComponent<PlayerSetup>() : null;
             if (setup == null || !(F_SetupCameras?.GetValue(setup) is Camera[] cams) || cams.Length < 2) return; // no first-person rig: no overlays
@@ -415,6 +422,7 @@ namespace Streplay
                 go.transform.localPosition = Vector3.zero;
                 go.transform.localRotation = Quaternion.identity;
                 _vmCams.Add(c);
+                if (i == 1) { _weaponCam = c; _weaponNear = c.nearClipPlane; _weaponFar = c.farClipPlane; }
                 Plugin.Log.LogDebug($"Viewmodel camera {i}: fov={c.fieldOfView} mask={c.cullingMask:X8} near={c.nearClipPlane}");
             }
             if (_vmCams.Count > 0) _maskFirstPerson = _maskWorld; // overlays draw the viewmodel layers

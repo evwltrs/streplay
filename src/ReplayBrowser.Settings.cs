@@ -129,6 +129,25 @@ namespace Streplay
             ry = Stepped(rx, ry, colW, "Speed", Plugin.FreeCamSpeed, 1f, 40f, 1f, "0");
             ry = Stepped(rx, ry, colW, "Mouse sensitivity", Plugin.MouseSensitivity, 0.2f, 6f, 0.1f, "0.0");
             ry = Stepped(rx, ry, colW, "Field of view", Plugin.DefaultFov, 50f, 120f, 1f, "0");
+            ry += 14f;
+
+            // ---- replay look
+            ry = Section(rx, ry, colW, "Replays and renders");
+            Label(rx, ry, "Player outlines");
+            Toggle(new Rect(rx + 190f, ry + 2f, 150f, 32f), Plugin.PlayerOutlines);
+            Ui.Text(new Rect(rx + 352f, ry, colW - 352f, 36f), "Your outline colours", 11, Ui.Faint);
+            ry += 44f;
+            Label(rx, ry, "Viewmodel");
+            bool kestrel = KestrelViewmodels.Installed;
+            GUI.enabled = kestrel;
+            int vm = Ui.Segmented(new Rect(rx + 190f, ry + 2f, 200f, 32f), new[] { "Default", "Kestrel" },
+                kestrel && Plugin.Viewmodel.Value == ViewmodelStyle.Kestrel ? 1 : 0, null, 12);
+            GUI.enabled = true;
+            if (kestrel) Plugin.Viewmodel.Value = vm == 1 ? ViewmodelStyle.Kestrel : ViewmodelStyle.Default;
+            ry += 40f;
+            Ui.Text(new Rect(rx + 190f, ry, colW - 190f, 34f), kestrel
+                ? "Kestrel: your arms and weapon as set in Minimal Viewmodels Reborn (offset, FOV, mirror, hidden arms)"
+                : "Kestrel uses the viewmodel set in Kestrel's Minimal Viewmodels Reborn, which isn't installed", 11, Ui.Faint, false, TextAnchor.UpperLeft, true);
 
             float rw = Ui.AutoW("Reset to defaults", null, 32f, 12);
             if (Ui.Button(new Rect(rx + colW - rw, body.yMax - 34f, rw, 32f), "Reset to defaults", false, Ui.Kind.Danger, null, 12, "Puts every setting on this page back"))
@@ -232,6 +251,7 @@ namespace Streplay
             {
                 Plugin.MaxFolderSizeGB, Plugin.RecordEnabled, Plugin.SampleRate, Plugin.ShowRecIndicator, Plugin.AutoMarkKills, Plugin.AutoMarkDeaths,
                 Plugin.BrowserKey, Plugin.MarkerKey, Plugin.RecordToggleKey, Plugin.FreeCamSpeed, Plugin.MouseSensitivity, Plugin.DefaultFov,
+                Plugin.PlayerOutlines, Plugin.Viewmodel,
             })
                 e.BoxedValue = e.DefaultValue;
         }

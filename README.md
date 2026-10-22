@@ -70,6 +70,8 @@ Open **Replays** (F10) and go to the **Settings** tab:
 - **Record rounds** on/off (also **F9** in game), **update rate** (30, 60, 90 or 120 Hz), the **REC** indicator, and automatic kill/death markers.
 - **Keys:** the Replays window (F10), marking (F8) and recording on/off (F9). Click a key, then press the new one.
 - **Free camera** speed, mouse sensitivity and field of view.
+- **Player outlines** on/off in replays and renders, in your outline colours (also in the render panel).
+- **Viewmodel:** Default, or Kestrel to show your arms and weapon as set in Kestrel's [Minimal Viewmodels Reborn](https://thunderstore.io/c/straftat/p/kestrel/Minimal_Viewmodels_Reborn/) (when it's installed).
 
 Everything else, including the replay folder and render defaults, is in r2modman → **Config editor** → `1nf.streplay.cfg`. The render settings are also in the render panel, and `HUD.Show…` picks which parts of the game's HUD appear in My view and in renders.
 

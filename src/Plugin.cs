@@ -54,6 +54,8 @@ namespace Streplay
         internal static ConfigEntry<float> FreeCamSpeed;
         internal static ConfigEntry<float> MouseSensitivity;
         internal static ConfigEntry<float> DefaultFov;
+        internal static ConfigEntry<bool> PlayerOutlines;
+        internal static ConfigEntry<ViewmodelStyle> Viewmodel;
         // Render
         internal static ConfigEntry<int> RenderWidth;
         internal static ConfigEntry<int> RenderHeight;
@@ -140,6 +142,12 @@ namespace Streplay
             FreeCamSpeed = Config.Bind("Playback", "FreeCamSpeed", 8f, "Free camera base speed (units/second).");
             MouseSensitivity = Config.Bind("Playback", "MouseSensitivity", 2f, "Free camera mouse sensitivity.");
             DefaultFov = Config.Bind("Playback", "DefaultFov", 90f, "Free camera starting field of view.");
+            PlayerOutlines = Config.Bind("Playback", "PlayerOutlines", false,
+                "Draw outlines around players in replays and renders, like the game's outline setting (with your outline colours and width). " +
+                "You get the team colour, everyone else the enemy colour.");
+            Viewmodel = Config.Bind("Playback", "Viewmodel", ViewmodelStyle.Default,
+                "Your first-person arms and weapon in My view and renders. Default: as the game draws them. Kestrel: with the settings currently set in " +
+                "Kestrel's Minimal Viewmodels Reborn (offset, FOV, mirrored, hidden arms or weapon); without that mod installed this is the same as Default.");
             RenderWidth = Config.Bind("Render", "Width", 1920,
                 new ConfigDescription("Output width in pixels (independent of the game window).", new AcceptableValueRange<int>(16, 8192)));
             RenderHeight = Config.Bind("Render", "Height", 1080,
