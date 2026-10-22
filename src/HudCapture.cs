@@ -97,7 +97,8 @@ namespace Streplay
         float _nextRootScan;
         Transform _localRoot;
 
-        static readonly string[] ExcludedPauseFields = { "mainMenu", "pauseMenu", "optionsMenu", "firstInterface", "secondInterface" };
+        // menus, and the "you're transmitting voice" note (voice isn't recorded, so it'd mean nothing in a replay)
+        static readonly string[] ExcludedPauseFields = { "mainMenu", "pauseMenu", "optionsMenu", "firstInterface", "secondInterface", "voiceChatText" };
 
         public void Reset()
         {

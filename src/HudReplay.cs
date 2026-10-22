@@ -155,6 +155,8 @@ namespace Streplay
                 // the proximity voice chat's "who's talking" tags: not part of the moment (voice isn't recorded), and
                 // rebuilt they lose their background and show as a white box (recordings made before the recorder skipped them)
                 if (el.Path.IndexOf("/VoiceChatIndicator/", StringComparison.Ordinal) >= 0) continue;
+                // and your own "transmitting voice" note, bottom right
+                if (el.Path.IndexOf("--PopupWriting--/VoiceText", StringComparison.Ordinal) >= 0) continue;
                 if (el.Dynamic)
                 {
                     var made = Create(el, localPlayer, ddolRoots);
