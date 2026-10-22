@@ -252,6 +252,9 @@ namespace Streplay
 
             if (Ui.Chip(new Rect(body.x, body.y, 150f, 28f), "Marked only", _markersOnly, "Only rounds with markers")) _markersOnly = !_markersOnly;
             Ui.Text(new Rect(body.x + 166f, body.y, 400f, 28f), N(items.Count, "ROUND") + "  ·  " + N(matches.Count, "MATCH"), 12, Ui.Dim, true);
+            if (!Plugin.RecordEnabled.Value)
+                Ui.Text(new Rect(body.x + 420f, body.y, body.width - 420f, 28f),
+                    $"Recording is off: {Plugin.RecordToggleKey.Value} in a match or the Settings tab turns it on", 12, Ui.Warn, true, TextAnchor.MiddleRight);
             var list = new Rect(body.x, body.y + 40f, body.width, body.height - 40f);
 
             // measure, then draw the visible part
@@ -315,7 +318,13 @@ namespace Streplay
             Ui.Text(new Rect(r.x + 14f, top, 30f, 38f), $"{m.RoundIndex + 1}", 13, Ui.Faint, true);
             Ui.Text(new Rect(r.x + 46f, top, 320f, 38f), m.Scene, 16, Ui.Bright, true);
             float tx = r.x + 46f + Mathf.Min(320f, Ui.Measure(m.Scene, 16, true)) + 12f;
-            if (m.Take > 0) { var tr = new Rect(tx, top + 9f, 66f, 20f); Ui.Slant(tr, Ui.AccentSoft); Ui.Text(tr, $"TAKE {m.Take}", 11, Ui.Accent, true, TextAnchor.MiddleCenter); }
+            if (m.Take > 0)
+            {
+                string take = m.Part >= 2 ? $"TAKE {m.Take} · PART {m.Part}" : $"TAKE {m.Take}";
+                var tr = new Rect(tx, top + 9f, Mathf.Max(66f, Ui.Measure(take, 11, true) + 22f), 20f);
+                Ui.Slant(tr, Ui.AccentSoft);
+                Ui.Text(tr, take, 11, Ui.Accent, true, TextAnchor.MiddleCenter);
+            }
             Ui.Text(new Rect(r.x + 420f, top, 90f, 38f), ReplayPlayer.Fmt(m.Duration) + (m.Finished ? "" : " (incomplete)"), 12, Ui.Dim);
             int kills = m.Highlights?.Sum(h => h.Kills) ?? 0;
             if (kills > 0) Ui.Text(new Rect(r.x + 520f, top, 90f, 38f), kills == 1 ? "1 KILL" : $"{kills} KILLS", 12, Ui.Kill, true);

@@ -29,6 +29,9 @@ namespace Streplay
         string _sessionId;
         int _roundIndex;
         bool _newMatch = true;
+        // the last saved file, to number the parts of a take that recording was switched off and on in
+        string _prevScene, _prevSession;
+        int _prevTake, _prevPart, _prevLoads = -1, _sceneLoads;
         bool _clientWasStarted;
         readonly Dictionary<string, float> _lastMarker = new Dictionary<string, float>();
         int _take = -1;                 // ScoreManager take index this file started in
@@ -95,6 +98,7 @@ namespace Streplay
         void Awake()
         {
             Instance = this;
+            SceneManager.sceneLoaded += (s, m) => _sceneLoads++;
             useGUILayout = false; // the REC tag and mark notice draw on Repaint only; skips IMGUI's per-frame layout pass and its garbage
         }
 
@@ -126,12 +130,20 @@ namespace Streplay
             if (Plugin.RecordToggleKey.Value.IsDown() && !ReplayPlayer.Active && !ReplayBrowser.Capturing) ToggleRecording();
 
             // works between takes too (loading screen), as long as a kill was just made
-            if (Plugin.MarkerKey.Value.IsDown() && !ReplayPlayer.Active && !ReplayBrowser.Capturing && !FlagRecentKill() && IsRecording)
-                AddMarker("Marker", auto: false);
+            if (Plugin.MarkerKey.Value.IsDown() && !ReplayPlayer.Active && !ReplayBrowser.Capturing) MarkerKey(scene);
+        }
+
+        void MarkerKey(string scene)
+        {
+            if (FlagRecentKill()) return;
+            if (IsRecording) AddMarker("Marker", auto: false);
+            // in a match with recording switched off: say so instead of doing nothing
+            else if (!Plugin.RecordEnabled.Value && IsMapScene(scene))
+                ShowToast("Recording is off", $"{Plugin.RecordToggleKey.Value} to turn it on", ToastIcon.Rec);
         }
 
         // what the marker key does (AutoTest)
-        internal void TestMarkerKey() { if (!FlagRecentKill() && IsRecording) AddMarker("Marker", auto: false); }
+        internal void TestMarkerKey() => MarkerKey(SceneManager.GetActiveScene().name);
 
         static int CurrentTake => ScoreManager.Instance != null ? ScoreManager.Instance.TakeIndex : -1;
 
@@ -280,6 +292,8 @@ namespace Streplay
                     Take = CurrentTake >= 0 ? CurrentTake + 1 : 0,
                     SampleRate = header.SampleRate,
                 };
+                _meta.Part = _prevLoads == _sceneLoads && _prevScene == scene && _prevSession == _sessionId && _prevTake == _meta.Take && _meta.Take > 0
+                    ? Math.Max(1, _prevPart) + 1 : 1;
                 _meta.Save();
                 _scene = scene;
                 _take = CurrentTake;
@@ -345,6 +359,7 @@ namespace Streplay
                 Plugin.Log.LogError($"Error saving replay metadata: {e.Message}");
             }
             Plugin.Log.LogInfo($"Saved replay {_meta.ReplayFile} ({duration:0.0}s, {_meta.Markers.Count} markers)");
+            _prevScene = _meta.Scene; _prevSession = _meta.SessionId; _prevTake = _meta.Take; _prevPart = _meta.Part; _prevLoads = _sceneLoads;
             _tracked.Clear();
             Retention.EnforceAsync(_meta.MetaPath);
         }

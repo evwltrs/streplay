@@ -18,6 +18,7 @@ namespace Streplay
         public float SampleRate;        // snapshots per second it was recorded at, 0 = unknown (older files: 60)
         public string SessionId = "";
         public int RoundIndex;
+        public int Part;                // 2+ when recording was switched off and on again during this take, 0/1 otherwise
         public int Take;                // take number within the map (1-based), 0 = unknown (older files)
         public string GameVersion = "";
         public bool Finished;
