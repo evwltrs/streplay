@@ -4,7 +4,7 @@
 
 ## Features
 
-- **Automatic recording.** Every round is saved to `Documents\Streplay`. A small `● REC` shows while it records. Press **F9** to turn recording off or back on.
+- **Automatic recording.** Every round is saved to `Documents\Streplay` (or `C:\Users\<you>\Streplay` if your Documents folder syncs to OneDrive, so replays don't fill your cloud storage). A small `● REC` shows while it records. Press **F9** to turn recording off or back on.
 - **Markers.** Press **F8** to mark a moment. Press F8 right after a kill to flag that kill. Your kills and deaths are marked automatically.
 - **Replay browser.** Click **Replays (F10)** on the main menu. Rounds are grouped by match, and markers jump straight to the moment.
 - **Highlights.** Your kills across every recording, ranked best first (flicks, headshots, quickscopes, multi-kills, long range…). Filter them, then **Watch** one to open the replay with the clip already set around it.
