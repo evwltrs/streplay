@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- **Weapons standing on spawners** (the Nizeh, the Katana and others with their own animation) stand upright in replays, like in game, instead of lying tipped over. Replays now apply the weapons' and players' recorded animation settings, which they had been missing; recordings made before this are fixed too.
+- **Sliding in My view:** your torso and legs show while you slide, like in game (in any player's POV too).
+
 ## 1.1.0
 
 - **Player outlines:** turn outlines around players on or off in replays and renders (Settings tab and the render panel). They use your outline colours and width from the game's settings: the team colour for you, the enemy colour for everyone else.

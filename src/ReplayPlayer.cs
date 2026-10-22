@@ -231,6 +231,8 @@ namespace Streplay
             _postFx.Dispose();
             ClearViewmodelStyle();
             _vmItems.Clear();
+            _slideBody = null;
+            _slideHidden.Clear();
             foreach (var p in _puppets)
                 if (p != null && p.Owned && p.Go != null) Destroy(p.Go);
             _puppets = Array.Empty<Puppet>();
@@ -735,12 +737,25 @@ namespace Streplay
             }
         }
 
+        // a disabled Animator (a body posed from the recorded skeleton) lists its parameters only while enabled
+        static AnimatorControllerParameter[] AnimatorParameters(Animator a)
+        {
+            if (a.enabled) return a.parameters;
+            a.enabled = true;
+            try { return a.parameters; }
+            finally { a.enabled = false; }
+        }
+
         static void ApplyAnimator(Puppet p, int k, AnimState s, AnimState n, float alpha)
         {
             var a = p.Anims[k];
-            if (a == null || !s.Enabled || !a.isActiveAndEnabled || a.runtimeAnimatorController == null) return;
-
+            if (a == null) return;
+            // Bind runs while the copy is still inactive, when an Animator lists no parameters: take them once it's active
             var ps = p.AnimParams[k];
+            if ((ps == null || ps.Length == 0) && s.Params.Length > 0 && a.gameObject.activeInHierarchy && a.runtimeAnimatorController != null)
+                ps = p.AnimParams[k] = AnimatorParameters(a);
+            if (!s.Enabled || !a.isActiveAndEnabled || a.runtimeAnimatorController == null) return;
+
             if (ps != null && ps.Length == s.Params.Length)
             {
                 for (int i = 0; i < ps.Length; i++)

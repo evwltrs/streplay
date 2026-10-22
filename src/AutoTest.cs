@@ -43,6 +43,10 @@ namespace Streplay
     //   cfg <Section.Key> <v>    set a config value (remember to put it back)
     //   flag                     what the marker key does (flags a kill made in the last few seconds)
     //   killline                 write a kill feed line through the game (in a session)
+    //   swapguns A=B [C=D ...]   the lobby's weapon swap (SawedOff=Nizeh), then every item spawner spawns again (in a session)
+    //   keys <seconds> <key>... [shot=<name>]   hold keys through the Input System (W LeftShift C slides), shot halfway
+    //   livecam <item> <d>       an extra camera d units from the first live item of that name (in a session)
+    //   camitem <item> <d>       the free camera d units from the first replay item of that name
     //   nexttake                 bump ScoreManager's take index (in an exploration session)
     //   browser on|off           open / close the replay browser
     //   eventsys                 log whether the game's UI input (EventSystem) is enabled
@@ -66,6 +70,29 @@ namespace Streplay
             File.Delete(file);
             Application.runInBackground = true;
             StartCoroutine(Run(lines));
+        }
+
+        // hold keyboard keys through the Input System (like a player pressing them) for some seconds, taking a shot halfway if asked
+        IEnumerator HoldKeys(float seconds, string[] names)
+        {
+            var kb = UnityEngine.InputSystem.Keyboard.current;
+            if (kb == null) { Log("no keyboard"); yield break; }
+            var keys = names.Where(n => !n.StartsWith("shot=")).Select(n => (UnityEngine.InputSystem.Key)Enum.Parse(typeof(UnityEngine.InputSystem.Key), n, true)).ToArray();
+            string shot = names.FirstOrDefault(n => n.StartsWith("shot="))?.Substring(5);
+            float end = Time.realtimeSinceStartup + seconds;
+            bool shotTaken = false;
+            while (Time.realtimeSinceStartup < end)
+            {
+                UnityEngine.InputSystem.InputSystem.QueueStateEvent(kb, new UnityEngine.InputSystem.LowLevel.KeyboardState(keys));
+                if (shot != null && !shotTaken && Time.realtimeSinceStartup > end - seconds / 2f)
+                {
+                    shotTaken = true;
+                    Log($"keys shot at rec {Recorder.Instance.CurrentTime:0.00}");
+                    yield return Shot(Path.Combine(Plugin.ReplayFolder.Value, "autotest", shot + ".png"));
+                }
+                yield return null;
+            }
+            UnityEngine.InputSystem.InputSystem.QueueStateEvent(kb, new UnityEngine.InputSystem.LowLevel.KeyboardState());
         }
 
         static void Log(string s) => Plugin.Log.LogInfo("[autotest] " + s);
@@ -212,6 +239,31 @@ namespace Streplay
                     PauseManager.Instance.WriteLog("<b><color=#" + PauseManager.Instance.selfNameLogColor + ">Target</color></b> was killed with a <b><color=white>FG42</color></b> by <b><color=#"
                         + PauseManager.Instance.enemyNameLogColor + ">" + (ClientInstance.Instance != null ? ClientInstance.Instance.PlayerNameTag : "me") + "</color></b>");
                     return null;
+                case "swapguns":
+                {
+                    // the lobby's weapon swap option (SawedOff=Nizeh ...), then every spawner spawns again through the game
+                    var sm = SpawnerManager.Instance;
+                    if (sm == null) { Log("no SpawnerManager"); return null; }
+                    foreach (var pair in a.Skip(1).Select(x => x.Split('='))) sm.Swaps[pair[0]] = pair[1];
+                    sm.sync___set_value_swapGuns(true, true);
+                    foreach (var it in FindObjectsOfType<ItemBehaviour>().Where(i => i.GetComponentInParent<ItemSpawner>() != null && !i.isTaken))
+                        FishNet.InstanceFinder.ServerManager.Despawn(it.gameObject);
+                    foreach (var sp in FindObjectsOfType<ItemSpawner>()) sp.Spawn();
+                    return null;
+                }
+                case "camitem": rp.TestCamItem(a[1], F(a[2])); return null;
+                case "livecam":
+                {
+                    var it = FindObjectsOfType<ItemBehaviour>().FirstOrDefault(i => i.name.StartsWith(a[1]));
+                    if (it == null) { Log("no item"); return null; }
+                    var c = it.transform.position;
+                    var cam = new GameObject("tmp live cam").AddComponent<Camera>();
+                    cam.depth = 100; cam.fieldOfView = 60f;
+                    cam.transform.position = c + new Vector3(F(a[2]), 0.4f, F(a[2]) * 0.3f);
+                    cam.transform.LookAt(c);
+                    return null;
+                }
+                case "keys": return HoldKeys(F(a[1]), a.Skip(2).ToArray());
                 case "hudprobe": if (a.Length > 1) HudReplay.ProbeOnRender = a[1] == "on"; else rp.TestProbe(); return null;
                 case "highlights": return WaitHighlights(a.Length > 1 ? int.Parse(a[1]) : 10);
                 case "hltab":

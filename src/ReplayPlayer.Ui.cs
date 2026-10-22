@@ -138,6 +138,17 @@ namespace Streplay
         internal void TestHelp(bool on) => _help = on;
         internal void TestProbe() => _hud.ProbeCentre(_rendering ? "render" : "window");
         internal void TestMoveFree(Vector3 d) => _freePos += Quaternion.Euler(_pitch, _yaw, 0f) * d;
+        // free cam d metres from the first item of that name, looking at it
+        internal void TestCamItem(string name, float d)
+        {
+            var p = _puppets.FirstOrDefault(q => q?.Go != null && q.Go.activeInHierarchy && q.Info.Name.StartsWith(name));
+            if (p == null) return;
+            var c = p.Go.transform.position;
+            _freePos = c + new Vector3(d, 0.4f, d * 0.3f);
+            var e = Quaternion.LookRotation(c - _freePos).eulerAngles;
+            _yaw = e.y; _pitch = e.x > 180 ? e.x - 360 : e.x; _fov = 60f; _camMode = CamMode.Free;
+        }
+
         // free cam d metres to the right of player n, looking at their chest
         internal void TestCamNear(int n, float d)
         {
@@ -335,11 +346,69 @@ namespace Streplay
                 bool show = p != target && (p.Health == null || p.Health.graphics == null || p.Health.graphics.activeSelf);
                 if (p.HatRoot.activeSelf != show) p.HatRoot.SetActive(show);
             }
+            bool sliding = target != null && target.Seen && Sliding(target);
+            ShowSlideBody(sliding ? target : null);
             if (target == null || !target.Seen) return;
-            if (target.Health != null && target.Health.graphics != null) target.Health.graphics.SetActive(false);
+            if (!sliding && target.Health != null && target.Health.graphics != null) target.Health.graphics.SetActive(false);
             if (InFirstPerson(target)) return; // the held weapon is part of the recorded viewmodel
             HideItem(target.HeldRight);
             HideItem(target.HeldLeft);
+        }
+
+        // While sliding the game shows you your own torso and legs (FirstPersonController switches them on for the slide).
+        // Read from the body animator's recorded parameters, which every player has, so this works in any POV: Slide, and
+        // Grounded, since Slide also stays on for a moment after a slide, in the air, when the game has hidden them again.
+        static readonly System.Reflection.FieldInfo F_FpcAnimator = HarmonyLib.AccessTools.Field(typeof(FirstPersonController), "animator");
+        static readonly System.Reflection.FieldInfo[] F_SlideParts =
+            { HarmonyLib.AccessTools.Field(typeof(FirstPersonController), "torso"), HarmonyLib.AccessTools.Field(typeof(FirstPersonController), "legLeft"),
+              HarmonyLib.AccessTools.Field(typeof(FirstPersonController), "legRight") };
+        static readonly System.Reflection.FieldInfo F_DisableForMe = HarmonyLib.AccessTools.Field(typeof(PlayerSetup), "gameObjectsToDisableForMe");
+        static readonly int SlideParam = Animator.StringToHash("Slide"), GroundedParam = Animator.StringToHash("Grounded");
+        Puppet _slideBody;
+        readonly List<GameObject> _slideHidden = new List<GameObject>();
+
+        static bool Sliding(Puppet p)
+        {
+            var fpc = p.Go.GetComponent<FirstPersonController>();
+            if (fpc == null || p.CurS?.Anims == null || !(F_FpcAnimator?.GetValue(fpc) is Animator a)) return false;
+            int k = Array.IndexOf(p.Anims, a);
+            if (k < 0 || k >= p.CurS.Anims.Length) return false;
+            var ps = p.AnimParams[k];
+            var values = p.CurS.Anims[k].Params;
+            if (ps == null || ps.Length != values.Length) return false;
+            bool slide = false, grounded = false;
+            for (int i = 0; i < ps.Length; i++)
+            {
+                if (ps[i].nameHash == SlideParam) slide = values[i] > 0.5f;
+                else if (ps[i].nameHash == GroundedParam) grounded = values[i] > 0.5f;
+            }
+            return slide && grounded;
+        }
+
+        // the body stays on, minus everything the game hides from its owner except the torso and legs (and no outline,
+        // which the owner never has); null puts it all back
+        void ShowSlideBody(Puppet p)
+        {
+            if (p == _slideBody)
+            {
+                // kept that way while it lasts (seeking re-applies the recorded body state)
+                if (p == null) return;
+                foreach (var go in _slideHidden) if (go != null && go.activeSelf) go.SetActive(false);
+                if (_outlines) PuppetFactory.ApplyOutline(p, false);
+                return;
+            }
+            foreach (var go in _slideHidden) if (go != null) go.SetActive(true);
+            _slideHidden.Clear();
+            if (_slideBody != null && _slideBody.Go != null) PuppetFactory.ApplyOutline(_slideBody, _outlines);
+            _slideBody = p;
+            if (p == null) return;
+            var fpc = p.Go.GetComponent<FirstPersonController>();
+            var keep = F_SlideParts.Select(f => f?.GetValue(fpc) as GameObject).Where(g => g != null).ToList();
+            if (F_DisableForMe?.GetValue(p.Go.GetComponent<PlayerSetup>()) is GameObject[] parts)
+                foreach (var go in parts)
+                    if (go != null && go.activeSelf && !keep.Contains(go)) { go.SetActive(false); _slideHidden.Add(go); }
+            foreach (var go in keep) if (!go.activeSelf) go.SetActive(true);
+            PuppetFactory.ApplyOutline(p, false);
         }
 
         // Whose eyes the camera is looking through (their body/items are hidden or shown as viewmodel).
@@ -413,7 +482,7 @@ namespace Streplay
             {
                 _outlines = Plugin.PlayerOutlines.Value;
                 foreach (var p in _puppets)
-                    if (p != null && p.Owned && p.Info.IsPlayer) PuppetFactory.ApplyOutline(p, _outlines);
+                    if (p != null && p.Owned && p.Info.IsPlayer && p != _slideBody) PuppetFactory.ApplyOutline(p, _outlines);
             }
         }
 
