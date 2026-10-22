@@ -1,4 +1,4 @@
-# STREPLAY
+![STREPLAY](https://raw.githubusercontent.com/evwltrs/streplay/main/docs/brand/streplay-banner.png)
 
 **Replays for STRAFTAT.** Every round you play is recorded automatically. Watch it back afterwards inside the real map: from your own eyes (with your HUD, arms, hitmarkers and sounds), from a free camera, or from any player. Then render clips up to 4K at any frame rate, with real motion blur, for your edits.
 
@@ -89,4 +89,8 @@ Everything else, including the replay folder and render defaults, is in r2modman
 
 ## Problems?
 
-Press **F11** in a match or a replay to write a `dump_*.txt` to the replay folder. Send it along with `BepInEx\LogOutput.log` from your r2modman profile (Settings → Browse profile folder) when you report a bug.
+Report bugs at **https://github.com/evwltrs/streplay/issues**. Press **F11** in a match or a replay to write a `dump_*.txt` to the replay folder, and attach it along with `BepInEx\LogOutput.log` from your r2modman profile (Settings → Browse profile folder).
+
+## Source
+
+STREPLAY is open source under the MIT license: https://github.com/evwltrs/streplay
