@@ -21,8 +21,17 @@ namespace Streplay
 
         bool InMenu => !ReplayPlayer.Active && SceneManager.GetActiveScene().name == "MainMenu";
 
+        // the folder is listed on a worker thread (ReplayIndex); the result is picked up here, on the main thread
+        volatile ReplayIndex.Snapshot _loaded;
+        bool _loading, _reloadAfter;
+        int _listVersion;
+        System.Diagnostics.Stopwatch _loadWatch;
+
+        void Start() => Refresh(); // warm the index at startup, so the first F10 is instant
+
         void Update()
         {
+            TakeLoaded();
             // The game's UI stays off while ours is up, and a moment longer: the mouse release of the click that closed
             // the browser (or exited a replay) would otherwise land on whatever menu button is underneath.
             bool want = _open || ReplayPlayer.SuspendGame || ReplayPlayer.BackToBrowser;
@@ -94,12 +103,37 @@ namespace Streplay
             if (_open) Refresh();
         }
 
+        // Lists the folder in the background; the window keeps showing the last list until the new one is in.
         void Refresh()
         {
-            try { _list = ReplayMeta.LoadAll(Plugin.ReplayFolder.Value); }
-            catch (Exception e) { Plugin.Log.LogError($"Could not list replays: {e.Message}"); _list.Clear(); }
+            if (_loading) { _reloadAfter = true; return; }
+            _loading = true;
+            _loadWatch = System.Diagnostics.Stopwatch.StartNew();
+            string dir = Plugin.ReplayFolder.Value;
+            new System.Threading.Thread(() =>
+            {
+                ReplayIndex.Snapshot s;
+                try { s = ReplayIndex.Load(dir); }
+                catch (Exception e) { Plugin.Log.LogError($"Could not list replays: {e.Message}"); s = new ReplayIndex.Snapshot(); }
+                _loaded = s;
+            }) { IsBackground = true, Name = "Streplay list", Priority = System.Threading.ThreadPriority.BelowNormal }.Start();
+        }
+
+        void TakeLoaded()
+        {
+            var s = _loaded;
+            if (s == null) return;
+            _loaded = null;
+            _loading = false;
+            _list = s.List;
+            _listVersion++;
+            _usedBytes = s.Bytes;
+            _usedRounds = s.List.Count;
+            // ten minutes of rounds at 60 Hz before trusting the player's own numbers over the measured default
+            _bytesPerSecPerHz = s.SecondsHz >= 600.0 * 60.0 ? s.SecondsHzBytes / s.SecondsHz : DefaultBytesPerSecPerHz;
             Highlights.Scan(_list);
-            MeasureStorage();
+            Plugin.Log.LogDebug($"Listed {_list.Count} rounds in {_loadWatch?.ElapsedMilliseconds ?? 0} ms");
+            if (_reloadAfter) { _reloadAfter = false; Refresh(); }
         }
 
         // ---------------------------------------------------------------- drawing
@@ -245,13 +279,50 @@ namespace Streplay
 
         float _roundsScroll, _hlScrollY;
 
+        // One match header and its rounds (oldest first), worked out once per list rather than every frame
+        sealed class MatchGroup
+        {
+            public string Key, Title, Summary;
+            public List<ReplayMeta> Rounds;
+            public float OpenHeight;
+        }
+
+        List<MatchGroup> _groups = new List<MatchGroup>();
+        int _itemCount, _groupsVersion = -1, _groupsHl = -1;
+        bool _groupsMarked;
+
+        List<MatchGroup> Groups()
+        {
+            int hl = Highlights.Changes;
+            if (_groupsVersion == _listVersion && _groupsMarked == _markersOnly && _groupsHl == hl) return _groups;
+            _groupsVersion = _listVersion; _groupsMarked = _markersOnly; _groupsHl = hl;
+            var items = _markersOnly ? _list.Where(m => m.Markers.Count > 0).ToList() : _list;
+            _itemCount = items.Count;
+            _groups = items.GroupBy(MatchId).Select(g =>
+            {
+                var rounds = g.Reverse().ToList();
+                var others = rounds.SelectMany(m => m.Players).Where(p => !p.IsLocal).Select(p => Strip(p.Name)).Distinct().Take(5).ToList();
+                int kills = rounds.Sum(m => m.Highlights?.Sum(h => h.Kills) ?? 0), flagged = rounds.Sum(m => m.Markers.Count(k => !k.Auto));
+                return new MatchGroup
+                {
+                    Key = g.Key,
+                    Rounds = rounds,
+                    Title = $"{rounds[0].StartUtc.ToLocalTime():ddd MMM d  ·  HH:mm}".ToUpperInvariant(),
+                    Summary = N(rounds.Count, "round") + (kills > 0 ? "  ·  " + N(kills, "kill") : "") + (flagged > 0 ? $"  ·  {flagged} flagged" : "") +
+                              (others.Count > 0 ? $"  ·  vs {string.Join(", ", others)}" : ""),
+                    OpenHeight = rounds.Sum(RoundHeight),
+                };
+            }).ToList();
+            return _groups;
+        }
+
         void DrawRounds(Rect body)
         {
-            var items = _markersOnly ? _list.Where(m => m.Markers.Count > 0).ToList() : _list;
-            var matches = items.GroupBy(MatchId).ToList();
+            var matches = Groups();
+            int itemCount = _itemCount;
 
             if (Ui.Chip(new Rect(body.x, body.y, 150f, 28f), "Marked only", _markersOnly, "Only rounds with markers")) _markersOnly = !_markersOnly;
-            Ui.Text(new Rect(body.x + 166f, body.y, 400f, 28f), N(items.Count, "ROUND") + "  ·  " + N(matches.Count, "MATCH"), 12, Ui.Dim, true);
+            Ui.Text(new Rect(body.x + 166f, body.y, 400f, 28f), N(itemCount, "ROUND") + "  ·  " + N(matches.Count, "MATCH"), 12, Ui.Dim, true);
             if (!Plugin.RecordEnabled.Value)
                 Ui.Text(new Rect(body.x + 420f, body.y, body.width - 420f, 28f),
                     $"Recording is off: {Plugin.RecordToggleKey.Value} in a match or the Settings tab turns it on", 12, Ui.Warn, true, TextAnchor.MiddleRight);
@@ -262,30 +333,27 @@ namespace Streplay
             for (int i = 0; i < matches.Count; i++)
             {
                 content += 48f;
-                if (MatchOpen(matches[i].Key, i)) foreach (var m in matches[i]) content += RoundHeight(m);
+                if (MatchOpen(matches[i].Key, i)) content += matches[i].OpenHeight;
             }
-            if (items.Count == 0) content = 60f;
+            if (itemCount == 0) content = 60f;
             _roundsScroll = Scroll(list, content, _roundsScroll);
 
             GUI.BeginGroup(list);
             float y = -_roundsScroll, w = list.width - (content > list.height ? 12f : 0f);
-            if (items.Count == 0)
-                Ui.Text(new Rect(0f, 0f, w, 60f), _markersOnly ? "No marked rounds yet." :
+            if (itemCount == 0)
+                Ui.Text(new Rect(0f, 0f, w, 60f), _loading ? "Loading your replays…" : _markersOnly ? "No marked rounds yet." :
                     $"No replays yet. Play a match and every take is recorded. Press {Plugin.MarkerKey.Value} during a round to mark a moment, or right after a kill to flag it.", 13, Ui.Dim, false, TextAnchor.UpperLeft, true);
             for (int i = 0; i < matches.Count; i++)
             {
                 var g = matches[i];
                 bool open = MatchOpen(g.Key, i);
-                var first = g.Last(); // oldest round of the match
-                var others = g.SelectMany(m => m.Players).Where(p => !p.IsLocal).Select(p => Strip(p.Name)).Distinct().Take(5).ToList();
-                int kills = g.Sum(m => m.Highlights?.Sum(h => h.Kills) ?? 0), flagged = g.Sum(m => m.Markers.Count(k => !k.Auto));
+                float gh = 48f + (open ? g.OpenHeight : 0f);
+                if (y + gh < 0f || y > list.height) { y += gh; continue; } // off screen: only its height counts
                 var hr = new Rect(0f, y + 6f, w, 38f);
                 if (Ui.Hover(hr)) Ui.Slant(hr, Ui.Wash(0.05f));
                 Ui.Icon(new Rect(12f, hr.center.y - 6f, 12f, 12f), open ? Ui.IconDown : Ui.IconPlay, Ui.Accent);
-                Ui.Text(new Rect(32f, hr.y, 260f, hr.height), $"{first.StartUtc.ToLocalTime():ddd MMM d  ·  HH:mm}".ToUpperInvariant(), 16, Ui.Bright, true);
-                Ui.Text(new Rect(260f, hr.y, w - 270f, hr.height),
-                    N(g.Count(), "round") + (kills > 0 ? "  ·  " + N(kills, "kill") : "") + (flagged > 0 ? $"  ·  {flagged} flagged" : "") +
-                    (others.Count > 0 ? $"  ·  vs {string.Join(", ", others)}" : ""), 12, Ui.Dim);
+                Ui.Text(new Rect(32f, hr.y, 260f, hr.height), g.Title, 16, Ui.Bright, true);
+                Ui.Text(new Rect(260f, hr.y, w - 270f, hr.height), g.Summary, 12, Ui.Dim);
                 if (GUI.Button(hr, GUIContent.none, GUIStyle.none))
                 {
                     if (i == 0) { if (!_collapsed.Remove(g.Key)) _collapsed.Add(g.Key); }
@@ -294,7 +362,7 @@ namespace Streplay
                 y += 48f;
                 if (!open) continue;
                 int n = 0;
-                foreach (var m in g.Reverse())
+                foreach (var m in g.Rounds)
                 {
                     float rh = RoundHeight(m);
                     if (y + rh > 0f && y < list.height) DrawRound(new Rect(0f, y, w, rh - 4f), m, n);
@@ -384,7 +452,7 @@ namespace Streplay
             float fw = 0f;
             foreach (var l in Filters) fw += Ui.AutoW(l, null, 28f, 12) + 3f;
             _filter = Ui.Segmented(new Rect(body.xMax - fw, body.y, fw, 28f), Filters, _filter, null, 12);
-            var shown = AllHighlights(_allMatches).Where(x => Matches(x.h, _filter)).ToList();
+            var shown = ShownHighlights();
             Ui.Text(new Rect(body.x + scW + 16f, body.y, body.width - scW - fw - 28f, 28f),
                 Highlights.Progress ?? $"{shown.Count} moments, best first", 12, Ui.Dim);
 
@@ -396,7 +464,7 @@ namespace Streplay
             GUI.BeginGroup(list);
             float y = -_hlScrollY, w = list.width - (content > list.height ? 12f : 0f);
             if (shown.Count == 0)
-                Ui.Text(new Rect(0f, 0f, w, 60f), Highlights.Scanning ? "Looking through your replays…" :
+                Ui.Text(new Rect(0f, 0f, w, 60f), Highlights.Scanning || _loading ? "Looking through your replays…" :
                     "No kills found yet. Every kill you make in a recorded round shows up here, best moments first.", 13, Ui.Dim, false, TextAnchor.UpperLeft, true);
             for (int i = 0; i < shown.Count; i++, y += rowH + 4f)
             {
@@ -407,6 +475,20 @@ namespace Streplay
             GUI.EndGroup();
             Ui.Text(new Rect(body.x, body.yMax - footer + 8f, body.width, 22f),
                 $"Watch opens the replay with the clip's in and out points set: press R to render it.  ·  {Plugin.MarkerKey.Value} right after a kill pushes it to the top.", 11, Ui.Faint);
+        }
+
+        List<(ReplayMeta m, ReplayMeta.MetaHighlight h)> _shown = new List<(ReplayMeta, ReplayMeta.MetaHighlight)>();
+        int _shownVersion = -1, _shownHl = -1, _shownFilter = -1;
+        bool _shownAll;
+
+        // the highlight list for the current tab and filter, sorted once per change rather than every frame
+        List<(ReplayMeta m, ReplayMeta.MetaHighlight h)> ShownHighlights()
+        {
+            int hl = Highlights.Changes;
+            if (_shownVersion == _listVersion && _shownHl == hl && _shownFilter == _filter && _shownAll == _allMatches) return _shown;
+            _shownVersion = _listVersion; _shownHl = hl; _shownFilter = _filter; _shownAll = _allMatches;
+            _shown = AllHighlights(_allMatches).Where(x => Matches(x.h, _filter)).ToList();
+            return _shown;
         }
 
         static readonly string[] Filters = { "All", "Flicks", "Snipes", "Multi-kills", "Headshots" };

@@ -110,24 +110,5 @@ namespace Streplay
             m.MetaPath = metaPath;
             return m;
         }
-
-        public static List<ReplayMeta> LoadAll(string dir)
-        {
-            var list = new List<ReplayMeta>();
-            if (!Directory.Exists(dir)) return list;
-            foreach (var f in Directory.GetFiles(dir, "*.strp.json"))
-            {
-                try
-                {
-                    var m = Load(f);
-                    if (m != null && File.Exists(m.ReplayPath)) list.Add(m);
-                }
-                catch (Exception e)
-                {
-                    Plugin.Log.LogWarning($"Skipping unreadable replay metadata {Path.GetFileName(f)}: {e.Message}");
-                }
-            }
-            return list.OrderByDescending(m => m.StartUtc).ToList();
-        }
     }
 }

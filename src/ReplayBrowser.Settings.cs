@@ -23,30 +23,6 @@ namespace Streplay
         int _usedRounds;
         double _bytesPerSecPerHz = DefaultBytesPerSecPerHz;
 
-        // what's on disk now, and how fast this player's own rounds fill it (once there's enough of them to go by)
-        void MeasureStorage()
-        {
-            long bytes = 0;
-            double weighted = 0; // seconds x Hz
-            int rounds = 0;
-            foreach (var m in _list)
-            {
-                try
-                {
-                    var f = new FileInfo(Path.Combine(Plugin.ReplayFolder.Value, m.ReplayFile));
-                    if (!f.Exists) continue;
-                    bytes += f.Length;
-                    rounds++;
-                    if (m.Finished && m.Duration > 5f) weighted += m.Duration * (m.SampleRate > 0f ? m.SampleRate : 60f);
-                }
-                catch { /* a file mid-write or gone: skip it */ }
-            }
-            _usedBytes = bytes;
-            _usedRounds = rounds;
-            // ten minutes of rounds at 60 Hz before trusting the player's own numbers over the measured default
-            _bytesPerSecPerHz = weighted >= 600.0 * 60.0 ? bytes / weighted : DefaultBytesPerSecPerHz;
-        }
-
         void DrawSettings(Rect body)
         {
             HandleKeyCapture();

@@ -111,7 +111,7 @@ namespace Streplay
                     return WaitForMenu();
                 case "open":
                 {
-                    var metas = ReplayMeta.LoadAll(Plugin.ReplayFolder.Value);
+                    var metas = ReplayIndex.Load(Plugin.ReplayFolder.Value).List;
                     var m = a[1] == "latest" ? metas.FirstOrDefault() : metas.FirstOrDefault(x => x.ReplayFile.StartsWith(a[1], StringComparison.OrdinalIgnoreCase));
                     if (m == null) { Log("no such replay"); return null; }
                     rp.Open(m, a.Length > 2 ? F(a[2]) : 0f);
@@ -158,6 +158,7 @@ namespace Streplay
                 case "seekview": Log(rp.TestSeekView(a.Length > 1 ? F(a[1]) : 0.05f)); return null;
                 case "perf": return PerfRun(F(a[1]), a.Length > 2 ? a[2] : "");
                 case "togglerec": Recorder.Instance.ToggleRecording(); return null;
+                case "failrec": Recorder.TestFailSample = true; return null;
                 case "droparms": Recorder.TestDropArms = true; return null;
                 case "weaponkill":
                 {

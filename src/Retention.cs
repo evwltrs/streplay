@@ -40,7 +40,7 @@ namespace Streplay
             foreach (var f in Directory.GetFiles(dir, "*.strp")) total += SizeOf(f);
             if (total <= limit) return;
 
-            var candidates = ReplayMeta.LoadAll(dir)
+            var candidates = ReplayIndex.Load(dir).List
                 .Where(m => m.Finished
                             && !string.Equals(m.MetaPath, justSavedMeta, StringComparison.OrdinalIgnoreCase)
                             && !m.Markers.Any(k => !k.Auto))

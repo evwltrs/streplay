@@ -86,7 +86,7 @@ namespace Streplay
             Instance = this;
             Log = Logger;
 
-            string defaultFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Streplay");
+            string defaultFolder = Path.Combine(DefaultParent(), "Streplay");
             ReplayFolder = Config.Bind("General", "ReplayFolder", defaultFolder, "Where replays (.strp + .strp.json) are saved.");
             MaxFolderSizeGB = Config.Bind("General", "MaxFolderSizeGB", 20f,
                 new ConfigDescription("When the replays in ReplayFolder take more than this, the oldest rounds without any of your markers are deleted " +
@@ -225,6 +225,24 @@ namespace Streplay
 
         // The configured folder (quotes trimmed) if it can be created; otherwise %LOCALAPPDATA%\Streplay, so a bad path,
         // an offline OneDrive or a blocked Documents folder doesn't stop recording altogether.
+        // Documents, unless OneDrive syncs it (Windows turns that on by default on many PCs): replays would be uploaded
+        // as they're recorded and could fill a free OneDrive. The user's own folder then, which OneDrive leaves alone.
+        static string DefaultParent()
+        {
+            string docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+            try
+            {
+                foreach (var v in new[] { "OneDrive", "OneDriveConsumer", "OneDriveCommercial" })
+                {
+                    string od = Environment.GetEnvironmentVariable(v);
+                    if (!string.IsNullOrEmpty(od) && docs.StartsWith(od.TrimEnd('\\') + "\\", StringComparison.OrdinalIgnoreCase))
+                        return Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                }
+            }
+            catch { /* odd environment: Documents it is */ }
+            return docs;
+        }
+
         static void EnsureReplayFolder()
         {
             string wanted = (ReplayFolder.Value ?? "").Trim().Trim('"');

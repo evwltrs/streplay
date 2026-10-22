@@ -218,7 +218,7 @@ namespace Streplay
                 // the frame record may be half written: close the file without an end record (the reader keeps
                 // everything up to the last complete record) and don't restart on this map straight away
                 _torn = true;
-                ReportFailure("Recording failed, stopping this round", e);
+                ReportFailure("Recording stopped", e);
                 Stop();
                 _failedScene = _scene;
                 _retryAt = Time.unscaledTime + 30f;
@@ -234,8 +234,19 @@ namespace Streplay
 
         void ReportFailure(string what, Exception e)
         {
+            ShowToast(what, Reason(e), ToastIcon.Rec, 6f);
             if (!_failureLogged) { _failureLogged = true; Plugin.Log.LogError($"{what}: {e}"); }
             else Plugin.Log.LogWarning($"{what}: {e.Message}");
+        }
+
+        // what went wrong, in words a player can act on
+        static string Reason(Exception e)
+        {
+            int code = e.HResult & 0xFFFF;
+            if (e is IOException && (code == 0x70 || code == 0x27)) return "The disk is full: free some space or lower the storage limit";
+            if (e is UnauthorizedAccessException || code == 0x5) return "Can't write to the replay folder";
+            if (e is DirectoryNotFoundException) return "The replay folder is gone";
+            return "Something went wrong; the log has the details";
         }
 
         void OnApplicationQuit() => Stop();
@@ -309,7 +320,7 @@ namespace Streplay
             }
             catch (Exception e)
             {
-                ReportFailure("Could not start recording", e);
+                ReportFailure("Couldn't start recording", e);
                 try { _w?.Dispose(); } catch { /* already broken */ }
                 _w = null;
                 try { if (path != null && File.Exists(path) && !File.Exists(path + ".json")) File.Delete(path); } catch { /* best effort */ }
@@ -394,8 +405,9 @@ namespace Streplay
         enum ToastIcon { Flag, Rec }
         ToastIcon _toastIcon;
 
-        void ShowToast(string title, string sub, ToastIcon icon = ToastIcon.Flag)
+        void ShowToast(string title, string sub, ToastIcon icon = ToastIcon.Flag, float seconds = 2.2f)
         {
+            ToastTime = seconds;
             _toastIcon = icon;
             _toastTitle = title;
             _toastSub = sub;
@@ -404,8 +416,11 @@ namespace Streplay
 
         // ---------------------------------------------------------------- sampling
 
+        internal static bool TestFailSample; // test hook: the next sample fails as on a full disk
+
         void Sample()
         {
+            if (TestFailSample) { TestFailSample = false; throw new IOException("test: disk full", unchecked((int)0x80070070)); }
             var spawned = InstanceFinder.ClientManager.Objects.Spawned;
 
             Perf.To(0);
@@ -1028,7 +1043,7 @@ namespace Streplay
 
         // ---------------------------------------------------------------- HUD
 
-        const float ToastTime = 2.2f;
+        float ToastTime = 2.2f;
 
         // REC tag and the marker notice, in the same look as the rest of Streplay's UI
         void OnGUI()

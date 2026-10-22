@@ -446,6 +446,7 @@ namespace Streplay
         static Thread _thread;
         static volatile int _done, _total;
         public static bool Scanning => _thread != null && _thread.IsAlive;
+        internal static int Changes; // bumped as each recording's highlights land, for lists built from them
         public static string Progress => Scanning ? $"Finding highlights {_done}/{_total}…" : null;
 
         // Scans finished recordings that have no (or outdated) highlights, saving the results into their .json.
@@ -509,6 +510,7 @@ namespace Streplay
                         m.HighlightsVersion = Version; // don't retry every time
                     }
                     _done++;
+                    System.Threading.Interlocked.Increment(ref Changes);
                 }
                 Plugin.Log.LogInfo($"Highlights: scored {_total} recordings in {sw.Elapsed.TotalSeconds:0}s ({reread} read from disk, the rest from stored measurements); weapon zoom: {ZoomSummary()}");
             }) { IsBackground = true, Name = "Streplay highlights", Priority = System.Threading.ThreadPriority.BelowNormal };
