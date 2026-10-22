@@ -45,6 +45,10 @@ namespace Streplay
     //   killline                 write a kill feed line through the game (in a session)
     //   swapguns A=B [C=D ...]   the lobby's weapon swap (SawedOff=Nizeh), then every item spawner spawns again (in a session)
     //   keys <seconds> <key>... [shot=<name>]   hold keys through the Input System (W LeftShift C slides), shot halfway
+    //   lookat <item> <d> | drop   stand d units from a live item looking at it (then keys 0.3 F picks it up) | drop what's
+    //                            in the right hand (in a session)
+    //   items                    log every live item (where it sits, held or not, position, rotation)
+    //   livecamat x y z | camat x y z   a camera looking at that point from 1.5 units away, live (in a session) or in a replay
     //   livecam <item> <d>       an extra camera d units from the first live item of that name (in a session)
     //   camitem <item> <d>       the free camera d units from the first replay item of that name
     //   nexttake                 bump ScoreManager's take index (in an exploration session)
@@ -70,6 +74,24 @@ namespace Streplay
             File.Delete(file);
             Application.runInBackground = true;
             StartCoroutine(Run(lines));
+        }
+
+        // stand the local player d units from the first live item of that name, looking at it (to pick it up with keys F)
+        IEnumerator LookAt(string name, float d)
+        {
+            var fpc = Settings.Instance != null ? Settings.Instance.localPlayer : null;
+            var it = FindObjectsOfType<ItemBehaviour>().FirstOrDefault(i => i.name.StartsWith(name) && !i.isTaken);
+            if (fpc == null || it == null) { Log("no local player or item"); yield break; }
+            var p = it.transform.position;
+            var ground = it.transform.parent != null ? it.transform.parent.position.y : p.y - 1f;
+            var feet = new Vector3(p.x + d, ground, p.z);
+            var cc = fpc.GetComponent<CharacterController>();
+            if (cc != null) cc.enabled = false;
+            fpc.transform.SetPositionAndRotation(feet, Quaternion.LookRotation(new Vector3(p.x - feet.x, 0f, p.z - feet.z)));
+            if (cc != null) cc.enabled = true;
+            yield return null;
+            var cam = fpc.playerCamera.transform.position;
+            fpc.rotationX = Mathf.Atan2(cam.y - p.y, new Vector2(cam.x - p.x, cam.z - p.z).magnitude) * Mathf.Rad2Deg;
         }
 
         // hold keyboard keys through the Input System (like a player pressing them) for some seconds, taking a shot halfway if asked
@@ -263,6 +285,22 @@ namespace Streplay
                     cam.transform.LookAt(c);
                     return null;
                 }
+                case "lookat": return LookAt(a[1], F(a[2]));
+                case "drop": Settings.Instance?.localPlayer?.GetComponent<PlayerPickup>()?.RightHandDrop(); return null;
+                case "items":
+                    foreach (var i in FindObjectsOfType<ItemBehaviour>())
+                        Log($"ITEM {i.name} on={(i.transform.parent != null ? i.transform.parent.name : "-")} taken={i.isTaken} pos={i.transform.position:F2} rot={i.transform.eulerAngles:F1} rec={Recorder.Instance.CurrentTime:0.00}");
+                    return null;
+                case "livecamat":
+                {
+                    var c = new Vector3(F(a[1]), F(a[2]), F(a[3]));
+                    var cam = new GameObject("tmp live cam").AddComponent<Camera>();
+                    cam.depth = 100; cam.fieldOfView = 60f;
+                    cam.transform.position = c + new Vector3(1.5f, 0.6f, 0.45f);
+                    cam.transform.LookAt(c);
+                    return null;
+                }
+                case "camat": rp.TestCamAt(new Vector3(F(a[1]), F(a[2]), F(a[3]))); return null;
                 case "keys": return HoldKeys(F(a[1]), a.Skip(2).ToArray());
                 case "hudprobe": if (a.Length > 1) HudReplay.ProbeOnRender = a[1] == "on"; else rp.TestProbe(); return null;
                 case "highlights": return WaitHighlights(a.Length > 1 ? int.Parse(a[1]) : 10);

@@ -138,6 +138,14 @@ namespace Streplay
         internal void TestHelp(bool on) => _help = on;
         internal void TestProbe() => _hud.ProbeCentre(_rendering ? "render" : "window");
         internal void TestMoveFree(Vector3 d) => _freePos += Quaternion.Euler(_pitch, _yaw, 0f) * d;
+        // free cam 1.5 m from a point, looking at it (matches AutoTest's livecamat)
+        internal void TestCamAt(Vector3 c)
+        {
+            _freePos = c + new Vector3(1.5f, 0.6f, 0.45f);
+            var e = Quaternion.LookRotation(c - _freePos).eulerAngles;
+            _yaw = e.y; _pitch = e.x > 180 ? e.x - 360 : e.x; _fov = 60f; _camMode = CamMode.Free;
+        }
+
         // free cam d metres from the first item of that name, looking at it
         internal void TestCamItem(string name, float d)
         {
