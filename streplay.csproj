@@ -1,7 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="local.props" Condition="Exists('local.props')" />
 
   <PropertyGroup>
-    <AssemblyName>Streplay</AssemblyName>
+    <AssemblyName>streplay</AssemblyName>
     <RootNamespace>Streplay</RootNamespace>
     <TargetFramework>netstandard2.1</TargetFramework>
     <LangVersion>latest</LangVersion>
@@ -13,7 +14,8 @@
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
 
-    <!-- Where the game lives. Override with: dotnet build -p:GameDir=... -->
+    <!-- Where the game lives: Steam's default library unless set in local.props (git-ignored, see local.props.example)
+         or with dotnet build -p:GameDir=... -->
     <GameDir Condition="'$(GameDir)' == ''">C:\Program Files (x86)\Steam\steamapps\common\STRAFTAT</GameDir>
     <ManagedDir>$(GameDir)\STRAFTAT_Data\Managed</ManagedDir>
     <!-- r2modman profile to deploy into for testing. Its own profile so it never runs next to a dev build. -->
@@ -60,16 +62,16 @@
   </ItemGroup>
 
   <Target Name="DeployToR2" AfterTargets="Build" Condition="Exists('$(PluginsDir)\..')">
-    <MakeDir Directories="$(PluginsDir)\Streplay" />
+    <MakeDir Directories="$(PluginsDir)\streplay" />
     <!-- fails while the game is running (it locks the DLL); close the game and build again -->
-    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(PluginsDir)\Streplay" Retries="0" ContinueOnError="WarnAndContinue">
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(PluginsDir)\streplay" Retries="0" ContinueOnError="WarnAndContinue">
       <Output TaskParameter="CopiedFiles" ItemName="_Deployed" />
     </Copy>
-    <Message Importance="high" Condition="'@(_Deployed)' != ''" Text="Streplay deployed to $(PluginsDir)\Streplay" />
-    <Message Importance="high" Condition="'@(_Deployed)' == ''" Text="Streplay NOT deployed (close the game and build again)" />
+    <Message Importance="high" Condition="'@(_Deployed)' != ''" Text="STREPLAY deployed to $(PluginsDir)\streplay" />
+    <Message Importance="high" Condition="'@(_Deployed)' == ''" Text="STREPLAY NOT deployed (close the game and build again)" />
   </Target>
 
-  <!-- dotnet build -c Release -t:ThunderstorePack  ->  dist\1nf-Streplay-<version>.zip, ready to upload to Thunderstore -->
+  <!-- dotnet build -c Release -t:ThunderstorePack  ->  dist\1nf-STREPLAY-<version>.zip, ready to upload to Thunderstore -->
   <Target Name="ThunderstorePack" DependsOnTargets="Build">
     <Error Condition="'$(Configuration)' != 'Release'" Text="Pack a Release build: dotnet build -c Release -t:ThunderstorePack" />
     <PropertyGroup>
@@ -82,11 +84,11 @@
            Text="src\Plugin.cs Version does not match $(Version)" />
     <PropertyGroup>
       <_Stage>$(MSBuildProjectDirectory)\obj\thunderstore</_Stage>
-      <_Zip>$(MSBuildProjectDirectory)\dist\1nf-Streplay-$(Version).zip</_Zip>
+      <_Zip>$(MSBuildProjectDirectory)\dist\1nf-STREPLAY-$(Version).zip</_Zip>
     </PropertyGroup>
     <RemoveDir Directories="$(_Stage)" />
     <Copy SourceFiles="thunderstore\manifest.json;thunderstore\icon.png;README.md;CHANGELOG.md" DestinationFolder="$(_Stage)" />
-    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(_Stage)\BepInEx\plugins\Streplay" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(_Stage)\BepInEx\plugins\streplay" />
     <MakeDir Directories="$(MSBuildProjectDirectory)\dist" />
     <Delete Files="$(_Zip)" />
     <ZipDirectory SourceDirectory="$(_Stage)" DestinationFile="$(_Zip)" />

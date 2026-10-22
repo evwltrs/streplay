@@ -1,0 +1,6 @@
+<Project>
+  <!-- Copy this to local.props (git-ignored) if STRAFTAT isn't in Steam's default library, and set its folder. -->
+  <PropertyGroup>
+    <GameDir Condition="'$(GameDir)' == ''">D:\SteamLibrary\steamapps\common\STRAFTAT</GameDir>
+  </PropertyGroup>
+</Project>

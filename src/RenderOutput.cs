@@ -219,7 +219,7 @@ namespace Streplay
             candidates.Add(Path.Combine(DropFolder, "ffmpeg.exe"));
             candidates.Add(Path.Combine(DropFolder, "bin", "ffmpeg.exe"));
             try { candidates.Add(Path.Combine(Path.GetDirectoryName(typeof(Ffmpeg).Assembly.Location) ?? "", "ffmpeg.exe")); } catch { }
-            // a companion package (1nf-StreplayFFmpeg, or any ffmpeg package) lands in its own plugins subfolder;
+            // a companion package (1nf-STREPLAY_FFMPEG, or any ffmpeg package) lands in its own plugins subfolder;
             // mod managers may nest it one level further, so look two levels down
             try
             {

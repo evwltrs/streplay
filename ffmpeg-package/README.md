@@ -1,6 +1,6 @@
-# Streplay FFmpeg
+# STREPLAY FFMPEG
 
-An optional add-on for **Streplay**. Install it, and Streplay renders replays straight to video files (MP4 with H.264/H.265, or MOV with ProRes 4444) instead of PNG frames. You don't need to set anything up: Streplay finds it automatically.
+An optional add-on for **STREPLAY**. Install it, and STREPLAY renders replays straight to video files (MP4 with H.264/H.265, or MOV with ProRes 4444) instead of PNG frames. You don't need to set anything up: STREPLAY finds it automatically.
 
 This package contains only **ffmpeg.exe**. It doesn't add anything to the game itself.
 
@@ -11,7 +11,7 @@ This package contains only **ffmpeg.exe**. It doesn't add anything to the game i
 
 ## License and source code
 
-FFmpeg is free software by the FFmpeg developers (https://ffmpeg.org). This build is compiled with `--enable-gpl --enable-version3`, so it is licensed under the **GNU GPL version 3** (see LICENSE.txt). It is distributed here as a separate, unmodified program. Streplay runs it as an external process and isn't linked with it.
+FFmpeg is free software by the FFmpeg developers (https://ffmpeg.org). This build is compiled with `--enable-gpl --enable-version3`, so it is licensed under the **GNU GPL version 3** (see LICENSE.txt). It is distributed here as a separate, unmodified program. STREPLAY runs it as an external process and isn't linked with it.
 
 Where to get the corresponding source code:
 

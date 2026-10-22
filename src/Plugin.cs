@@ -16,8 +16,8 @@ namespace Streplay
     [BepInPlugin(Guid, Name, Version)]
     public sealed class Plugin : BaseUnityPlugin
     {
-        public const string Guid = "1nf.Streplay";
-        public const string Name = "Streplay";
+        public const string Guid = "1nf.streplay";
+        public const string Name = "STREPLAY";
         public const string Version = "1.0.0";  // keep in sync with Streplay.csproj and thunderstore/manifest.json
 
         internal static ManualLogSource Log;
@@ -86,7 +86,7 @@ namespace Streplay
             Instance = this;
             Log = Logger;
 
-            string defaultFolder = Path.Combine(DefaultParent(), "Streplay");
+            string defaultFolder = Path.Combine(DefaultParent(), "STREPLAY");
             ReplayFolder = Config.Bind("General", "ReplayFolder", defaultFolder, "Where replays (.strp + .strp.json) are saved.");
             MaxFolderSizeGB = Config.Bind("General", "MaxFolderSizeGB", 20f,
                 new ConfigDescription("When the replays in ReplayFolder take more than this, the oldest rounds without any of your markers are deleted " +
@@ -220,7 +220,7 @@ namespace Streplay
         static void TryPatch(string what, Action patch)
         {
             try { patch(); }
-            catch (Exception e) { Log.LogError($"Could not hook {what} (a game update?); that part of Streplay is off: {e.Message}"); }
+            catch (Exception e) { Log.LogError($"Could not hook {what} (a game update?); that part of STREPLAY is off: {e.Message}"); }
         }
 
         // The configured folder (quotes trimmed) if it can be created; otherwise %LOCALAPPDATA%\Streplay, so a bad path,
@@ -230,17 +230,22 @@ namespace Streplay
         static string DefaultParent()
         {
             string docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+            return InOneDrive(docs) ? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) : docs;
+        }
+
+        internal static bool InOneDrive(string path)
+        {
             try
             {
                 foreach (var v in new[] { "OneDrive", "OneDriveConsumer", "OneDriveCommercial" })
                 {
                     string od = Environment.GetEnvironmentVariable(v);
-                    if (!string.IsNullOrEmpty(od) && docs.StartsWith(od.TrimEnd('\\') + "\\", StringComparison.OrdinalIgnoreCase))
-                        return Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                    if (!string.IsNullOrEmpty(od) && (path + "\\").StartsWith(od.TrimEnd('\\') + "\\", StringComparison.OrdinalIgnoreCase))
+                        return true;
                 }
             }
-            catch { /* odd environment: Documents it is */ }
-            return docs;
+            catch { /* odd environment: assume not */ }
+            return false;
         }
 
         static void EnsureReplayFolder()
@@ -256,7 +261,7 @@ namespace Streplay
             }
             catch (Exception e)
             {
-                string fallback = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Streplay");
+                string fallback = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "STREPLAY");
                 Log.LogError($"Can't use the replay folder '{wanted}' ({e.Message}). Using {fallback} instead; change General.ReplayFolder to fix it.");
                 try { Directory.CreateDirectory(fallback); ReplayFolder.Value = fallback; }
                 catch (Exception e2) { Log.LogError($"Can't create {fallback} either: {e2.Message}. Recording will fail."); }

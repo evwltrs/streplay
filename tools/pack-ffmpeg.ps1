@@ -1,4 +1,4 @@
-# Builds the optional ffmpeg companion package: dist\1nf-StreplayFFmpeg-<version>.zip
+# Builds the optional ffmpeg companion package: dist\1nf-STREPLAY_FFMPEG-<version>.zip
 # Run: powershell -File tools\pack-ffmpeg.ps1 -Ffmpeg "C:\path\to\ffmpeg.exe"
 param([Parameter(Mandatory = $true)][string]$Ffmpeg)
 $ErrorActionPreference = 'Stop'
@@ -20,7 +20,7 @@ Copy-Item $Ffmpeg (Join-Path $stage 'ffmpeg.exe')
 
 $dist = Join-Path $root 'dist'
 New-Item -ItemType Directory -Force $dist | Out-Null
-$zip = Join-Path $dist "1nf-StreplayFFmpeg-$ver.zip"
+$zip = Join-Path $dist "1nf-STREPLAY_FFMPEG-$ver.zip"
 if (Test-Path $zip) { Remove-Item -Force $zip }
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 [System.IO.Compression.ZipFile]::CreateFromDirectory($stage, $zip, [System.IO.Compression.CompressionLevel]::Optimal, $false)

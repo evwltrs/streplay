@@ -79,6 +79,7 @@ namespace Streplay
         internal void TestHighlightsTab(bool all) { _tab = 1; _allMatches = all; }
         internal void TestRoundsTab() => _tab = 0;
         internal void TestSettingsTab() => _tab = 2;
+        internal string TestUseFolder(string path) { _folderEdit = path; UseFolder(); return (_folderBad ? "rejected: " : "ok: ") + _folderNote; }
         internal string TestTopHighlights(int n) => string.Join("\n", AllHighlights(true).Take(n).Select(x =>
             $"  {x.h.Score:0.0} {x.m.Scene} take {x.m.Take} @{x.h.T0:0.00}-{x.h.T1:0.00} [{string.Join(", ", x.h.Tags)}] {x.h.Detail}"));
         internal void TestWatchHighlight(int index)

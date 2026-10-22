@@ -72,11 +72,24 @@ namespace Streplay
             }
             y += 8f;
             Label(lx, y, "Folder");
-            float ow = Ui.AutoW("Open", null, 30f, 12);
-            Ui.Text(new Rect(lx + 190f, y, colW - 190f - ow - 10f, 36f), Plugin.ReplayFolder.Value, 11, Ui.Dim);
+            if (_folderEdit == null) _folderEdit = Plugin.ReplayFolder.Value;
+            float ow = Ui.AutoW("Open", null, 30f, 12), uw = Ui.AutoW("Use", null, 30f, 12);
+            Ui.Text(new Rect(lx + 190f, y, colW - 190f - ow - uw - 12f, 36f), "Paste a path to change it", 11, Ui.Faint);
+            _folderEdit = Ui.Field(new Rect(lx, y + 40f, colW, 30f), _folderEdit, 260);
+            bool edited = !string.Equals((_folderEdit ?? "").Trim().Trim('"').TrimEnd('\\'), Plugin.ReplayFolder.Value.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase);
+            GUI.enabled = edited;
+            if (Ui.Button(new Rect(lx + colW - ow - uw - 6f, y + 3f, uw, 30f), "Use", false, edited ? Ui.Kind.Primary : Ui.Kind.Normal, null, 12, "Save new rounds in this folder"))
+                UseFolder();
+            GUI.enabled = true;
             if (Ui.Button(new Rect(lx + colW - ow, y + 3f, ow, 30f), "Open", false, Ui.Kind.Normal, null, 12, "Open the replay folder"))
                 Ui.OpenFolder(Plugin.ReplayFolder.Value);
-            y += 52f;
+            y += 78f;
+            if (_folderNote != null)
+            {
+                Ui.Text(new Rect(lx, y, colW, 34f), _folderNote, 11, _folderBad ? Ui.Warn : Ui.Dim, false, TextAnchor.UpperLeft, true);
+                y += 34f;
+            }
+            y += 14f;
 
             // ---- recording
             y = Section(lx, y, colW, "Recording");
@@ -120,6 +133,39 @@ namespace Streplay
             float rw = Ui.AutoW("Reset to defaults", null, 32f, 12);
             if (Ui.Button(new Rect(rx + colW - rw, body.yMax - 34f, rw, 32f), "Reset to defaults", false, Ui.Kind.Danger, null, 12, "Puts every setting on this page back"))
                 ResetSettings();
+        }
+
+        string _folderEdit, _folderNote;
+        bool _folderBad;
+
+        // A pasted folder: made if it isn't there, checked for writing, then used for new rounds. Nothing is moved: the
+        // replays already recorded stay where they are (copying gigabytes from inside the game is how replays get lost).
+        void UseFolder()
+        {
+            string p = Environment.ExpandEnvironmentVariables((_folderEdit ?? "").Trim().Trim('"'));
+            _folderBad = true;
+            try
+            {
+                // IsPathRooted throws on characters a path can't have (a stray | or < from a paste)
+                if (p.Length == 0 || !Path.IsPathRooted(p)) { _folderNote = "Paste a full folder path, like D:\\Replays"; return; }
+                p = Path.GetFullPath(p).TrimEnd('\\');
+                Directory.CreateDirectory(p);
+                string probe = Path.Combine(p, ".streplay-write-test");
+                File.WriteAllText(probe, "");
+                File.Delete(probe);
+            }
+            catch (Exception e)
+            {
+                _folderNote = $"Can't save replays there: {e.Message}";
+                return;
+            }
+            string old = Plugin.ReplayFolder.Value;
+            Plugin.ReplayFolder.Value = p;
+            _folderEdit = p;
+            _folderBad = false;
+            _folderNote = $"New rounds are saved here. Replays already recorded stay in {old}" +
+                          (Plugin.InOneDrive(p) ? "  ·  this folder syncs to OneDrive, so replays will upload to it" : "");
+            Refresh();
         }
 
         static float Section(float x, float y, float w, string title)

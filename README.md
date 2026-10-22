@@ -1,10 +1,10 @@
-# Streplay
+# STREPLAY
 
 **Replays for STRAFTAT.** Every round you play is recorded automatically. Watch it back afterwards inside the real map: from your own eyes (with your HUD, arms, hitmarkers and sounds), from a free camera, or from any player. Then render clips up to 4K at any frame rate, with real motion blur, for your edits.
 
 ## Features
 
-- **Automatic recording.** Every round is saved to `Documents\Streplay` (or `C:\Users\<you>\Streplay` if your Documents folder syncs to OneDrive, so replays don't fill your cloud storage). A small `● REC` shows while it records. Press **F9** to turn recording off or back on.
+- **Automatic recording.** Every round is saved to `Documents\STREPLAY` (or `C:\Users\<you>\STREPLAY` if your Documents folder syncs to OneDrive, so replays don't fill your cloud storage). A small `● REC` shows while it records. Press **F9** to turn recording off or back on.
 - **Markers.** Press **F8** to mark a moment. Press F8 right after a kill to flag that kill. Your kills and deaths are marked automatically.
 - **Replay browser.** Click **Replays (F10)** on the main menu. Rounds are grouped by match, and markers jump straight to the moment.
 - **Highlights.** Your kills across every recording, ranked best first (flicks, headshots, quickscopes, multi-kills, long range…). Filter them, then **Watch** one to open the replay with the clip already set around it.
@@ -19,13 +19,13 @@
   - Set in/out points for a clip.
 - **Render.** Any resolution (independent of your window), 30 to 240 fps, film-style motion blur, H.264/H.265/ProRes video or a PNG sequence, with the replay's sound.
 
-Streplay only records what your own game already shows you. It is marked as vanilla-compatible, so you can still join normal lobbies.
+STREPLAY only records what your own game already shows you. It is marked as vanilla-compatible, so you can still join normal lobbies.
 
 ## Install
 
 Install with a mod manager: **r2modman** or the Thunderstore Mod Manager. BepInEx is installed for you. Start the game with **Start modded**.
 
-To render straight to **video** files (MP4/MOV), also install **1nf-StreplayFFmpeg**, which contains ffmpeg. Streplay finds it automatically. If you already have ffmpeg, you can use that instead: put `ffmpeg.exe` in an `ffmpeg` folder inside your replay folder, or on your PATH, or set `FfmpegPath` in the config.
+To render straight to **video** files (MP4/MOV), also install **STREPLAY FFMPEG** (`1nf-STREPLAY_FFMPEG`), which contains ffmpeg. STREPLAY finds it automatically. If you already have ffmpeg, you can use that instead: put `ffmpeg.exe` in an `ffmpeg` folder inside your replay folder, or on your PATH, or set `FfmpegPath` in the config.
 
 Without ffmpeg, renders are saved as PNG frames plus a `.wav` file, which any video editor can import.
 
@@ -66,12 +66,12 @@ Without ffmpeg, renders are saved as PNG frames plus a `.wav` file, which any vi
 Open **Replays** (F10) and go to the **Settings** tab:
 
 - **Max replay storage** (default 20 GB, or no limit), with an estimate of how many hours of rounds that holds. When the folder grows past it, the oldest rounds **without** your markers are deleted. Rounds with your markers are always kept.
-- Streplay never fills your disk: it always leaves **2 GB free** on the drive. If space runs low, old unmarked rounds go early; if there's nothing left to remove, recording pauses until you free some space. You get a warning in game when less than 5 GB is free.
+- STREPLAY never fills your disk: it always leaves **2 GB free** on the drive. If space runs low, old unmarked rounds go early; if there's nothing left to remove, recording pauses until you free some space. You get a warning in game when less than 5 GB is free.
 - **Record rounds** on/off (also **F9** in game), **update rate** (30, 60, 90 or 120 Hz), the **REC** indicator, and automatic kill/death markers.
 - **Keys:** the Replays window (F10), marking (F8) and recording on/off (F9). Click a key, then press the new one.
 - **Free camera** speed, mouse sensitivity and field of view.
 
-Everything else, including the replay folder and render defaults, is in r2modman → **Config editor** → `1nf.Streplay.cfg`. The render settings are also in the render panel, and `HUD.Show…` picks which parts of the game's HUD appear in My view and in renders.
+Everything else, including the replay folder and render defaults, is in r2modman → **Config editor** → `1nf.streplay.cfg`. The render settings are also in the render panel, and `HUD.Show…` picks which parts of the game's HUD appear in My view and in renders.
 
 ## Tips
 

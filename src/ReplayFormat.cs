@@ -328,7 +328,7 @@ namespace Streplay
             using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 1 << 16);
             var prefix = new byte[8];
             if (fs.Read(prefix, 0, 8) != 8 || prefix[0] != Magic[0] || prefix[1] != Magic[1] || prefix[2] != Magic[2] || prefix[3] != Magic[3])
-                throw new InvalidDataException("Not a Streplay file");
+                throw new InvalidDataException("Not a STREPLAY file");
             int version = BitConverter.ToInt32(prefix, 4);
             if (version > ReplayHeader.CurrentVersion)
                 throw new InvalidDataException($"Replay version {version} is newer than this plugin supports ({ReplayHeader.CurrentVersion})");

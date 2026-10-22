@@ -4,3 +4,4 @@ dist/
 *.user
 .vs/
 *.exe
+local.props
