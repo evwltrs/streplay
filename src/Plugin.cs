@@ -28,6 +28,7 @@ namespace Streplay
         internal static ConfigEntry<float> MaxFolderSizeGB;
         // Recording
         internal static ConfigEntry<bool> RecordEnabled;
+        internal static ConfigEntry<KeyboardShortcut> RecordToggleKey;
         internal static ConfigEntry<float> SampleRate;
         internal static ConfigEntry<bool> ShowRecIndicator;
         internal static ConfigEntry<KeyboardShortcut> MarkerKey;
@@ -92,9 +93,12 @@ namespace Streplay
                     "after each round (rounds with markers you placed are always kept; renders are never touched). 0 = never delete.",
                     new AcceptableValueRange<float>(0f, 10000f)));
 
-            RecordEnabled = Config.Bind("Recording", "Enabled", true, "Automatically record every round you play or spectate.");
+            RecordEnabled = Config.Bind("Recording", "Enabled", true, "Record every round you play or spectate. ToggleKey flips this in game.");
+            RecordToggleKey = Config.Bind("Recording", "ToggleKey", new KeyboardShortcut(KeyCode.F9),
+                "Turn recording on or off (the Enabled setting). Turning it off mid-round saves what was recorded so far; turning it on starts from that moment.");
             SampleRate = Config.Bind("Recording", "SampleRate", 60f,
-                new ConfigDescription("Snapshots per second. Higher = smoother slow-mo, bigger files.", new AcceptableValueRange<float>(10f, 144f)));
+                new ConfigDescription("Snapshots per second. Higher = smoother slow-mo, bigger files. At most one per rendered frame: at 80 fps, 120 records 80.",
+                    new AcceptableValueRange<float>(10f, 144f)));
             ShowRecIndicator = Config.Bind("Recording", "ShowRecIndicator", true, "Show a small REC dot while recording.");
             MarkerKey = Config.Bind("Recording", "MarkerKey", new KeyboardShortcut(KeyCode.F8), "Drop a marker on the current moment.");
             AutoMarkKills = Config.Bind("Recording", "AutoMarkKills", true, "Automatically drop a marker when you get a kill.");

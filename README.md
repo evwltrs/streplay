@@ -4,7 +4,7 @@
 
 ## Features
 
-- **Automatic recording.** Every round is saved to `Documents\Streplay`. A small `● REC` shows while it records.
+- **Automatic recording.** Every round is saved to `Documents\Streplay`. A small `● REC` shows while it records. Press **F9** to turn recording off or back on.
 - **Markers.** Press **F8** to mark a moment. Press F8 right after a kill to flag that kill. Your kills and deaths are marked automatically.
 - **Replay browser.** Click **Replays (F10)** on the main menu. Rounds are grouped by match, and markers jump straight to the moment.
 - **Highlights.** Your kills across every recording, ranked best first (flicks, headshots, quickscopes, multi-kills, long range…). Filter them, then **Watch** one to open the replay with the clip already set around it.
@@ -63,19 +63,18 @@ Without ffmpeg, renders are saved as PNG frames plus a `.wav` file, which any vi
 
 ## Settings
 
-Every setting is in r2modman → **Config editor** → `1nf.Streplay.cfg`. The useful ones:
+Open **Replays** (F10) and go to the **Settings** tab:
 
-- `General.ReplayFolder`: where replays are saved.
-- `General.MaxFolderSizeGB`: when the folder grows past this, the oldest rounds **without** markers are deleted. Rounds with your markers are kept.
-- `Recording.Enabled`: turn automatic recording off.
-- `Recording.MarkerKey`: the marker key (default F8).
-- `Playback.BrowserKey`: the replay browser key (default F10).
-- `Render.*`: default size, fps, motion blur, format and output folder. You can also change these in the render panel.
-- `HUD.Show…`: which parts of the game's HUD appear in My view and in renders.
+- **Max replay storage** (default 20 GB, or no limit), with an estimate of how many hours of rounds that holds. When the folder grows past it, the oldest rounds **without** your markers are deleted. Rounds with your markers are always kept.
+- **Record rounds** on/off (also **F9** in game), **update rate** (30, 60, 90 or 120 Hz), the **REC** indicator, and automatic kill/death markers.
+- **Keys:** the Replays window (F10), marking (F8) and recording on/off (F9). Click a key, then press the new one.
+- **Free camera** speed, mouse sensitivity and field of view.
+
+Everything else, including the replay folder and render defaults, is in r2modman → **Config editor** → `1nf.Streplay.cfg`. The render settings are also in the render panel, and `HUD.Show…` picks which parts of the game's HUD appear in My view and in renders.
 
 ## Tips
 
-- **Smoother slow motion:** set `Recording.SampleRate` to 120. Recordings get about twice as big.
+- **Smoother slow motion:** set the update rate to 120 Hz in Settings. Recordings get about twice as big, and the game has to run at 120 fps or more to record that many.
 - **Motion blur makes renders slower:** more blur sub-frames means a longer render. 16 is a good default; Adaptive adds extra sub-frames only for fast flicks.
 - **Same moment, different angles:** switch the camera and render again. Each render uses the camera you're in.
 

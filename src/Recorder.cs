@@ -123,8 +123,10 @@ namespace Streplay
             if (scene != _failedScene) _failedScene = null;
             if (!IsRecording && want && (_failedScene == null || Time.unscaledTime >= _retryAt)) Begin(scene);
 
+            if (Plugin.RecordToggleKey.Value.IsDown() && !ReplayPlayer.Active && !ReplayBrowser.Capturing) ToggleRecording();
+
             // works between takes too (loading screen), as long as a kill was just made
-            if (Plugin.MarkerKey.Value.IsDown() && !ReplayPlayer.Active && !FlagRecentKill() && IsRecording)
+            if (Plugin.MarkerKey.Value.IsDown() && !ReplayPlayer.Active && !ReplayBrowser.Capturing && !FlagRecentKill() && IsRecording)
                 AddMarker("Marker", auto: false);
         }
 
@@ -276,6 +278,7 @@ namespace Streplay
                     RoundIndex = header.RoundIndex,
                     GameVersion = header.GameVersion,
                     Take = CurrentTake >= 0 ? CurrentTake + 1 : 0,
+                    SampleRate = header.SampleRate,
                 };
                 _meta.Save();
                 _scene = scene;
@@ -365,8 +368,20 @@ namespace Streplay
             return marker;
         }
 
-        void ShowToast(string title, string sub)
+        internal void ToggleRecording()
         {
+            bool on = !Plugin.RecordEnabled.Value;
+            Plugin.RecordEnabled.Value = on; // Update stops or starts the file next frame
+            string key = Plugin.RecordToggleKey.Value.ToString();
+            ShowToast(on ? "Recording on" : "Recording off", on ? $"{key} to turn it off" : $"{key} to turn it back on", ToastIcon.Rec);
+        }
+
+        enum ToastIcon { Flag, Rec }
+        ToastIcon _toastIcon;
+
+        void ShowToast(string title, string sub, ToastIcon icon = ToastIcon.Flag)
+        {
+            _toastIcon = icon;
             _toastTitle = title;
             _toastSub = sub;
             _toastAt = Time.unscaledTime;
@@ -1045,7 +1060,12 @@ namespace Streplay
             GUI.color = new Color(1f, 1f, 1f, a);
             Ui.Slant(r, Ui.Bg);
             Ui.Slant(new Rect(r.x + 10f, r.y + 9f, 7f, r.height - 18f), Ui.Accent);
-            GUI.DrawTexture(new Rect(r.x + 26f, r.y + 14f, 18f, 18f), Ui.IconFlag, ScaleMode.ScaleToFit, true, 0f, Ui.WithA(Ui.Accent, a), 0f, 0f); // this overload ignores GUI.color
+            if (_toastIcon == ToastIcon.Rec)
+            {
+                bool on = Plugin.RecordEnabled.Value;
+                Ui.Circle(new Vector2(r.x + 35f, r.center.y), 6f, Ui.WithA(on ? RecRed : Ui.Faint, a)); // Fill ignores GUI.color
+            }
+            else GUI.DrawTexture(new Rect(r.x + 26f, r.y + 14f, 18f, 18f), Ui.IconFlag, ScaleMode.ScaleToFit, true, 0f, Ui.WithA(Ui.Accent, a), 0f, 0f); // this overload ignores GUI.color
             Ui.Text(new Rect(r.x + 52f, r.y + 5f, w - 56f, 22f), title, 16, Ui.Bright, true);
             Ui.Text(new Rect(r.x + 52f, r.y + 24f, w - 56f, 16f), _toastSub, 12, Ui.Dim);
             GUI.color = keep;

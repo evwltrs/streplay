@@ -308,6 +308,39 @@ namespace Streplay
             return GUI.Button(r, GUIContent.none, GUIStyle.none);
         }
 
+        // A drag slider over discrete stops (0..count-1): a track, the filled part up to the knob, a slanted knob.
+        // Discrete so a setting is only written when it actually changes, not on every frame of a drag.
+        public static int Slider(Rect r, int index, int count, string tip = null)
+        {
+            int id = GUIUtility.GetControlID(FocusType.Passive);
+            var ev = Event.current;
+            var track = new Rect(r.x, r.center.y - 3f, r.width, 6f);
+            float Frac(int i) => count <= 1 ? 0f : i / (float)(count - 1);
+            int At(float mx) => Mathf.Clamp(Mathf.RoundToInt((mx - r.x) / Mathf.Max(1f, r.width) * (count - 1)), 0, count - 1);
+            switch (ev.GetTypeForControl(id))
+            {
+                case EventType.MouseDown:
+                    if (ev.button == 0 && r.Contains(ev.mousePosition)) { GUIUtility.hotControl = id; index = At(ev.mousePosition.x); ev.Use(); }
+                    break;
+                case EventType.MouseDrag:
+                    if (GUIUtility.hotControl == id) { index = At(ev.mousePosition.x); ev.Use(); }
+                    break;
+                case EventType.MouseUp:
+                    if (GUIUtility.hotControl == id) { GUIUtility.hotControl = 0; ev.Use(); }
+                    break;
+                case EventType.Repaint:
+                    bool hot = GUIUtility.hotControl == id, hover = Hover(r);
+                    Slant(track, Wash(0.08f));
+                    float f = Frac(index);
+                    if (f > 0f) Slant(new Rect(track.x, track.y, Mathf.Max(track.height, track.width * f), track.height), WithA(Accent, hot || hover ? 0.9f : 0.7f));
+                    var knob = new Rect(track.x + track.width * f - 7f, r.center.y - 11f, 14f, 22f);
+                    Slant(knob, hot ? Bright : hover ? Accent : PrimaryBg);
+                    break;
+            }
+            Tip(r, tip);
+            return index;
+        }
+
         public static string Field(Rect r, string value, int maxLength = 200)
         {
             Slant(r, new Color(0.06f, 0.09f, 0.075f, 1f));

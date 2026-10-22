@@ -7,8 +7,8 @@ using UnityEngine.SceneManagement;
 
 namespace Streplay
 {
-    // Main-menu window listing recorded rounds (grouped by match) and their markers.
-    internal sealed class ReplayBrowser : MonoBehaviour
+    // Main-menu window listing recorded rounds (grouped by match) and their markers, the best moments, and settings.
+    internal sealed partial class ReplayBrowser : MonoBehaviour
     {
         bool _open;
         List<ReplayMeta> _list = new List<ReplayMeta>();
@@ -16,7 +16,7 @@ namespace Streplay
         readonly HashSet<string> _unfolded = new HashSet<string>();  // older matches the user opened
         bool _markersOnly;
         string _notice;
-        bool _highlightsTab;
+        int _tab; // 0 rounds, 1 highlights, 2 settings
         bool _allMatches;
 
         bool InMenu => !ReplayPlayer.Active && SceneManager.GetActiveScene().name == "MainMenu";
@@ -29,7 +29,7 @@ namespace Streplay
             if (want) _blockUntil = Time.unscaledTime + 0.35f;
             bool held = Input.GetMouseButton(0) || Input.GetMouseButton(1) || Input.GetMouseButton(2);
             BlockGameUi(want || Time.unscaledTime < _blockUntil || (_blocked.Count > 0 && held));
-            if (!InMenu) { _open = false; return; }
+            if (!InMenu) { _open = false; _capture = null; return; }
             if (ReplayPlayer.MenuNotice != null) { _notice = ReplayPlayer.MenuNotice; ReplayPlayer.MenuNotice = null; _open = true; Refresh(); }
             // back from a replay: straight to the list you came from (same tab, same scroll), not the bare menu
             if (ReplayPlayer.BackToBrowser)
@@ -37,6 +37,7 @@ namespace Streplay
                 ReplayPlayer.BackToBrowser = false;
                 if (!_open) { _open = true; Refresh(); }
             }
+            if (Capturing) return; // the key being bound is the settings tab's, not ours
             if (Plugin.BrowserKey.Value.IsDown()) Toggle();
             else if (_open && Input.GetKeyDown(KeyCode.Escape)) _open = false;
         }
@@ -66,8 +67,9 @@ namespace Streplay
 
 #if STREPLAY_AUTOTEST
         internal void TestSetOpen(bool on) { if (_open != on) Toggle(); }
-        internal void TestHighlightsTab(bool all) { _highlightsTab = true; _allMatches = all; }
-        internal void TestRoundsTab() => _highlightsTab = false;
+        internal void TestHighlightsTab(bool all) { _tab = 1; _allMatches = all; }
+        internal void TestRoundsTab() => _tab = 0;
+        internal void TestSettingsTab() => _tab = 2;
         internal string TestTopHighlights(int n) => string.Join("\n", AllHighlights(true).Take(n).Select(x =>
             $"  {x.h.Score:0.0} {x.m.Scene} take {x.m.Take} @{x.h.T0:0.00}-{x.h.T1:0.00} [{string.Join(", ", x.h.Tags)}] {x.h.Detail}"));
         internal void TestWatchHighlight(int index)
@@ -88,6 +90,7 @@ namespace Streplay
         void Toggle()
         {
             _open = !_open;
+            _capture = null;
             if (_open) Refresh();
         }
 
@@ -96,6 +99,7 @@ namespace Streplay
             try { _list = ReplayMeta.LoadAll(Plugin.ReplayFolder.Value); }
             catch (Exception e) { Plugin.Log.LogError($"Could not list replays: {e.Message}"); _list.Clear(); }
             Highlights.Scan(_list);
+            MeasureStorage();
         }
 
         // ---------------------------------------------------------------- drawing
@@ -207,12 +211,13 @@ namespace Streplay
 
             // header
             Ui.Text(new Rect(x, y - 2f, 220f, 40f), "REPLAYS", 30, Ui.Bright, true);
-            float tabsW = Ui.AutoW("Rounds", null, 32f, 13) + Ui.AutoW("Highlights", null, 32f, 13) + 3f;
-            int tab = Ui.Segmented(new Rect(x + 180f, y + 3f, tabsW, 32f), new[] { "Rounds", "Highlights" }, _highlightsTab ? 1 : 0, null, 13);
-            _highlightsTab = tab == 1;
+            string[] tabs = { "Rounds", "Highlights", "Settings" };
+            float tabsW = tabs.Sum(t => Ui.AutoW(t, null, 32f, 13)) + 3f * (tabs.Length - 1);
+            int tab = Ui.Segmented(new Rect(x + 180f, y + 3f, tabsW, 32f), tabs, _tab, null, 13);
+            if (tab != _tab) { _tab = tab; _capture = null; }
             float bx = right;
             Rect Hb(string l) { float w = Ui.AutoW(l, null, 32f, 12); bx -= w; var r = new Rect(bx, y + 3f, w, 32f); bx -= 4f; return r; }
-            if (Ui.Button(new Rect(right - 34f, y + 3f, 34f, 32f), "", false, Ui.Kind.Ghost, Ui.IconClose, 12, "Close (Esc)")) _open = false;
+            if (Ui.Button(new Rect(right - 34f, y + 3f, 34f, 32f), "", false, Ui.Kind.Ghost, Ui.IconClose, 12, "Close (Esc)")) { _open = false; _capture = null; }
             bx -= 42f;
             if (Ui.Button(Hb("Folder"), "Folder", false, Ui.Kind.Normal, null, 12, "Open the replay folder")) Ui.OpenFolder(Plugin.ReplayFolder.Value);
             if (Ui.Button(Hb("Refresh"), "Refresh", false, Ui.Kind.Normal, null, 12)) Refresh();
@@ -227,7 +232,9 @@ namespace Streplay
             }
 
             var body = new Rect(x, y, right - x, win.yMax - y - 20f);
-            if (_highlightsTab) DrawHighlights(body); else DrawRounds(body);
+            if (_tab == 1) DrawHighlights(body);
+            else if (_tab == 2) DrawSettings(body);
+            else DrawRounds(body);
         }
 
         // "1 round", "2 rounds", "3 MATCHES"

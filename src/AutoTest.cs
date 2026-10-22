@@ -157,6 +157,7 @@ namespace Streplay
                 }
                 case "seekview": Log(rp.TestSeekView(a.Length > 1 ? F(a[1]) : 0.05f)); return null;
                 case "perf": return PerfRun(F(a[1]), a.Length > 2 ? a[2] : "");
+                case "togglerec": Recorder.Instance.ToggleRecording(); return null;
                 case "droparms": Recorder.TestDropArms = true; return null;
                 case "weaponkill":
                 {
@@ -207,6 +208,7 @@ namespace Streplay
                 case "highlights": return WaitHighlights(a.Length > 1 ? int.Parse(a[1]) : 10);
                 case "hltab":
                     if (a.Length > 1 && a[1] == "rounds") ReplayBrowser.Instance.TestRoundsTab();
+                    else if (a.Length > 1 && a[1] == "settings") ReplayBrowser.Instance.TestSettingsTab();
                     else ReplayBrowser.Instance.TestHighlightsTab(a.Length > 1 && a[1] == "all");
                     return null;
                 case "hlwatch": ReplayBrowser.Instance.TestWatchHighlight(int.Parse(a[1])); return WaitForReplay();

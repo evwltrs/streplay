@@ -15,6 +15,7 @@ namespace Streplay
         public string Scene = "";
         public DateTime StartUtc;
         public float Duration;
+        public float SampleRate;        // snapshots per second it was recorded at, 0 = unknown (older files: 60)
         public string SessionId = "";
         public int RoundIndex;
         public int Take;                // take number within the map (1-based), 0 = unknown (older files)
