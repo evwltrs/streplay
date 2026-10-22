@@ -66,6 +66,7 @@ Without ffmpeg, renders are saved as PNG frames plus a `.wav` file, which any vi
 Open **Replays** (F10) and go to the **Settings** tab:
 
 - **Max replay storage** (default 20 GB, or no limit), with an estimate of how many hours of rounds that holds. When the folder grows past it, the oldest rounds **without** your markers are deleted. Rounds with your markers are always kept.
+- Streplay never fills your disk: it always leaves **2 GB free** on the drive. If space runs low, old unmarked rounds go early; if there's nothing left to remove, recording pauses until you free some space. You get a warning in game when less than 5 GB is free.
 - **Record rounds** on/off (also **F9** in game), **update rate** (30, 60, 90 or 120 Hz), the **REC** indicator, and automatic kill/death markers.
 - **Keys:** the Replays window (F10), marking (F8) and recording on/off (F9). Click a key, then press the new one.
 - **Free camera** speed, mouse sensitivity and field of view.

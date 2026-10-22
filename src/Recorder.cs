@@ -114,6 +114,12 @@ namespace Streplay
             // the next map played is a new match
             if (scene == "VictoryScene" || scene == "MainMenu") _newMatch = true;
             bool want = Plugin.RecordEnabled.Value && clientStarted && !ReplayPlayer.Active && IsMapScene(scene);
+            if (want && Time.unscaledTime >= _nextDiskCheck)
+            {
+                _nextDiskCheck = Time.unscaledTime + 5f;
+                CheckDisk();
+            }
+            want &= !_diskPaused;
 
             if (IsRecording && (!want || scene != _scene)) Stop();
             // a map is played for several takes without a scene change; each take gets its own file
@@ -247,6 +253,44 @@ namespace Streplay
             if (e is UnauthorizedAccessException || code == 0x5) return "Can't write to the replay folder";
             if (e is DirectoryNotFoundException) return "The replay folder is gone";
             return "Something went wrong; the log has the details";
+        }
+
+        // ---- disk space: never fill the drive (see Disk, Retention)
+        bool _diskPaused;
+        float _nextDiskCheck;
+        static bool _lowNoticeShown; // once per game session
+
+        void CheckDisk()
+        {
+            string dir = Plugin.ReplayFolder.Value;
+            long free = Disk.Free(dir);
+            if (free < 0) { _diskPaused = false; return; } // can't tell (network folder): don't get in the way
+            if (free < Disk.Floor)
+            {
+                // once paused, every round left has your markers (or is the one just saved): no point going on deleting
+                if (!Retention.Running && !_diskPaused) Retention.EnforceAsync(CurrentMetaPath);
+                if (Retention.Stuck && !_diskPaused)
+                {
+                    _diskPaused = true;
+                    Plugin.Log.LogWarning($"Recording paused: {Disk.Gb(free)} free on {Disk.Drive(dir)}");
+                    Stop();
+                    ShowToast("Recording paused", $"Only {Disk.Gb(free)} free on {Disk.Drive(dir)}  ·  it carries on once there's space", ToastIcon.Rec, 6f);
+                }
+                return;
+            }
+            Retention.Stuck = false;
+            if (_diskPaused && free >= Disk.Floor + (512L << 20))
+            {
+                _diskPaused = false;
+                Plugin.Log.LogInfo($"Recording resumed: {Disk.Gb(free)} free on {Disk.Drive(dir)}");
+                ShowToast("Recording resumed", $"{Disk.Gb(free)} free on {Disk.Drive(dir)}", ToastIcon.Rec, 3f);
+            }
+            else if (!_lowNoticeShown && free < Disk.Low)
+            {
+                _lowNoticeShown = true;
+                Plugin.Log.LogInfo($"Low disk space: {Disk.Gb(free)} free on {Disk.Drive(dir)}");
+                ShowToast("Low disk space", $"{Disk.Gb(free)} free on {Disk.Drive(dir)}  ·  old rounds go early to keep {Disk.Gb(Disk.Floor)} free", ToastIcon.Rec, 6f);
+            }
         }
 
         void OnApplicationQuit() => Stop();

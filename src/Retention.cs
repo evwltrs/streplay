@@ -5,20 +5,26 @@ using System.Threading;
 
 namespace Streplay
 {
-    // Keeps the replay folder under General.MaxFolderSizeGB: after a round is saved, the oldest finished rounds
-    // without any marker the player placed themselves are deleted until the folder fits. Renders are never touched.
-    // Runs off the main thread (it only does file IO), one pass at a time.
+    // Keeps the replay folder under General.MaxFolderSizeGB, and the drive it's on above Disk.Floor free: after a round
+    // is saved (and while recording, when the drive runs low), the oldest finished rounds without any marker the player
+    // placed themselves are deleted until both hold. Renders are never touched. Runs off the main thread (it only
+    // does file IO), one pass at a time.
     internal static class Retention
     {
         static int _running;
+        public static bool Running => _running == 1;
+        // the last pass couldn't get the drive back above Disk.Floor: every round left has the player's markers
+        public static volatile bool Stuck;
 
         public static void EnforceAsync(string justSavedMeta)
         {
             float limitGb = Plugin.MaxFolderSizeGB.Value;
             string dir = Plugin.ReplayFolder.Value;
-            if (limitGb <= 0f || string.IsNullOrEmpty(dir)) return;
+            if (string.IsNullOrEmpty(dir)) return;
+            long free = Disk.Free(dir);
+            if (limitGb <= 0f && (free < 0 || free >= Disk.Floor)) return;
             if (Interlocked.Exchange(ref _running, 1) == 1) return;
-            long limit = (long)(limitGb * 1024d * 1024d * 1024d);
+            long limit = limitGb <= 0f ? long.MaxValue : (long)(limitGb * 1024d * 1024d * 1024d);
             ThreadPool.QueueUserWorkItem(_ =>
             {
                 try { Enforce(dir, limit, justSavedMeta); }
@@ -38,7 +44,9 @@ namespace Streplay
             if (!Directory.Exists(dir)) return;
             long total = 0;
             foreach (var f in Directory.GetFiles(dir, "*.strp")) total += SizeOf(f);
-            if (total <= limit) return;
+            long free = Disk.Free(dir);
+            long needFree = free >= 0 && free < Disk.Floor ? Disk.Floor - free : 0L;
+            if (total <= limit && needFree <= 0) { Stuck = false; return; }
 
             var candidates = ReplayIndex.Load(dir).List
                 .Where(m => m.Finished
@@ -51,7 +59,7 @@ namespace Streplay
             long freed = 0;
             foreach (var m in candidates)
             {
-                if (total <= limit) break;
+                if (total <= limit && freed >= needFree) break;
                 long size = SizeOf(m.ReplayPath);
                 try
                 {
@@ -67,8 +75,12 @@ namespace Streplay
                 freed += size;
                 deleted++;
             }
+            Stuck = needFree > 0 && freed < needFree;
             if (deleted > 0)
-                Plugin.Log.LogInfo($"Replay folder over {limit / (1024d * 1024 * 1024):0.#} GB: deleted the {deleted} oldest unmarked rounds ({freed / (1024d * 1024):0} MB)");
+                Plugin.Log.LogInfo((needFree > 0 ? $"Drive low on space ({Disk.Gb(free)} free)" : $"Replay folder over {limit / (1024d * 1024 * 1024):0.#} GB") +
+                                   $": deleted the {deleted} oldest unmarked rounds ({freed / (1024d * 1024):0} MB)");
+            if (Stuck)
+                Plugin.Log.LogWarning($"Only {Disk.Gb(free)} free on {Disk.Drive(dir)} and every remaining round has your markers: recording pauses until there's {Disk.Gb(Disk.Floor)} free");
             else if (total > limit)
                 Plugin.Log.LogWarning($"Replay folder is {total / (1024d * 1024 * 1024):0.0} GB, over the {limit / (1024d * 1024 * 1024):0.#} GB limit, " +
                                       "but every remaining round has your markers, so nothing was deleted");

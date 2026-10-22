@@ -12,4 +12,5 @@ First public release.
   - Timeline with clip range, slow motion and frame stepping.
 - **Render:** any resolution and frame rate, sub-frame motion blur, H.264/H.265/ProRes through ffmpeg or a PNG sequence, with sound.
 - **Folder size limit:** the oldest unmarked rounds are deleted when the replay folder passes the limit.
+- **Disk safety:** always leaves 2 GB free on the drive (old unmarked rounds go early, recording pauses if nothing can), with a low-space warning.
 - **Settings tab:** storage limit with an hours estimate, recording on/off (F9 in game), update rate, REC indicator, automatic markers, key bindings and free camera settings.

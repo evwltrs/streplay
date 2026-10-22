@@ -19,7 +19,7 @@ namespace Streplay
         // measured over real 2-4 player rounds: about 55 KB per second of round at 60 Hz
         const double DefaultBytesPerSecPerHz = 55.0 * 1024.0 / 60.0;
 
-        long _usedBytes;
+        long _usedBytes, _freeBytes = -1;
         int _usedRounds;
         double _bytesPerSecPerHz = DefaultBytesPerSecPerHz;
 
@@ -50,6 +50,21 @@ namespace Streplay
             y += 18f;
             Ui.Text(new Rect(lx + 190f, y, colW - 190f, 18f), "Rounds with your own markers are always kept", 11, Ui.Faint);
             y += 20f;
+            if (_freeBytes >= 0)
+            {
+                long cap = SizeStops[ns] <= 0f ? long.MaxValue : (long)(SizeStops[ns] * 1024.0 * 1024.0 * 1024.0);
+                string drive = Disk.Drive(Plugin.ReplayFolder.Value);
+                string note = _freeBytes < Disk.Floor
+                    ? $"Disk almost full ({Disk.Gb(_freeBytes)} free on {drive}): recording pauses until there's {Disk.Gb(Disk.Floor)} free"
+                    : cap - _usedBytes > _freeBytes - Disk.Floor
+                        ? $"Only {Disk.Gb(_freeBytes)} free on {drive}, less than this limit needs  ·  old rounds go early so {Disk.Gb(Disk.Floor)} always stays free"
+                        : null;
+                if (note != null)
+                {
+                    Ui.Text(new Rect(lx + 190f, y, colW - 190f, 34f), note, 11, Ui.Warn, false, TextAnchor.UpperLeft, true);
+                    y += 34f;
+                }
+            }
             if (SizeStops[ns] > 0f && _usedBytes > SizeStops[ns] * 1024.0 * 1024.0 * 1024.0)
             {
                 Ui.Text(new Rect(lx + 190f, y, colW - 190f, 34f), "Less than what's used now: the oldest unmarked rounds are deleted after your next round", 11, Ui.Warn, false, TextAnchor.UpperLeft, true);

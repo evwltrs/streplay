@@ -158,6 +158,7 @@ namespace Streplay
                 case "seekview": Log(rp.TestSeekView(a.Length > 1 ? F(a[1]) : 0.05f)); return null;
                 case "perf": return PerfRun(F(a[1]), a.Length > 2 ? a[2] : "");
                 case "togglerec": Recorder.Instance.ToggleRecording(); return null;
+                case "fakefree": Disk.TestFree = F(a[1]) < 0f ? -1 : (long)(F(a[1]) * (1L << 30)); return null;
                 case "failrec": Recorder.TestFailSample = true; return null;
                 case "droparms": Recorder.TestDropArms = true; return null;
                 case "weaponkill":

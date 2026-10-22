@@ -128,6 +128,7 @@ namespace Streplay
             _list = s.List;
             _listVersion++;
             _usedBytes = s.Bytes;
+            _freeBytes = Disk.Free(Plugin.ReplayFolder.Value);
             _usedRounds = s.List.Count;
             // ten minutes of rounds at 60 Hz before trusting the player's own numbers over the measured default
             _bytesPerSecPerHz = s.SecondsHz >= 600.0 * 60.0 ? s.SecondsHzBytes / s.SecondsHz : DefaultBytesPerSecPerHz;
@@ -323,9 +324,12 @@ namespace Streplay
 
             if (Ui.Chip(new Rect(body.x, body.y, 150f, 28f), "Marked only", _markersOnly, "Only rounds with markers")) _markersOnly = !_markersOnly;
             Ui.Text(new Rect(body.x + 166f, body.y, 400f, 28f), N(itemCount, "ROUND") + "  ·  " + N(matches.Count, "MATCH"), 12, Ui.Dim, true);
-            if (!Plugin.RecordEnabled.Value)
-                Ui.Text(new Rect(body.x + 420f, body.y, body.width - 420f, 28f),
-                    $"Recording is off: {Plugin.RecordToggleKey.Value} in a match or the Settings tab turns it on", 12, Ui.Warn, true, TextAnchor.MiddleRight);
+            string banner = !Plugin.RecordEnabled.Value ? $"Recording is off: {Plugin.RecordToggleKey.Value} in a match or the Settings tab turns it on"
+                : _freeBytes >= 0 && _freeBytes < Disk.Floor ? $"Disk almost full ({Disk.Gb(_freeBytes)} free on {Disk.Drive(Plugin.ReplayFolder.Value)}): recording pauses until there's {Disk.Gb(Disk.Floor)} free"
+                : _freeBytes >= 0 && _freeBytes < Disk.Low ? $"Low disk space: {Disk.Gb(_freeBytes)} free on {Disk.Drive(Plugin.ReplayFolder.Value)}"
+                : null;
+            if (banner != null)
+                Ui.Text(new Rect(body.x + 420f, body.y, body.width - 420f, 28f), banner, 12, Ui.Warn, true, TextAnchor.MiddleRight);
             var list = new Rect(body.x, body.y + 40f, body.width, body.height - 40f);
 
             // measure, then draw the visible part
