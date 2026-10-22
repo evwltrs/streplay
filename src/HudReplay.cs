@@ -212,6 +212,23 @@ namespace Streplay
         }
 
         // Rebuild a HUD piece the game spawned at runtime (e.g. a hitmarker) on the same canvas.
+        // The kill feed line's text keeps a few units of margin under it (set on the game's line prefab, not recorded),
+        // which is what leaves the gap below the text in its box. Taken from the prefab so older recordings get it too.
+        static Vector4? _logTextMargin;
+
+        static Vector4 LogTextMargin()
+        {
+            if (_logTextMargin.HasValue) return _logTextMargin.Value;
+            var prefab = MatchLogsOffline.Instance != null ? MatchLogsOffline.Instance.chatLinePrefab : null;
+            if (prefab == null && MatchLogs.Instance != null) prefab = MatchLogs.Instance.chatLinePrefab;
+            if (prefab == null) prefab = Resources.FindObjectsOfTypeAll<Goodgulf.Graphics.MatchChatLine>().Select(l => l.gameObject).FirstOrDefault(go => !go.scene.IsValid());
+            var text = prefab != null ? prefab.GetComponentInChildren<TMP_Text>(true) : null;
+            if (text == null) return Vector4.zero; // not cached: try again on the next replay
+            _logTextMargin = text.margin;
+            Plugin.Log.LogDebug($"Kill feed text margin {text.margin}");
+            return text.margin;
+        }
+
         (Component c, Canvas canvas) Create(UiElementInfo el, Transform localPlayer, GameObject[] ddolRoots)
         {
             // walk up the recorded path until something exists, then use its root canvas
@@ -242,6 +259,7 @@ namespace Streplay
                 tmp.fontSize = el.FontSize;
                 tmp.alignment = (TextAlignmentOptions)el.Alignment;
                 tmp.fontStyle = (FontStyles)el.FontStyle;
+                if (el.Path.IndexOf(LogPath, StringComparison.Ordinal) >= 0) tmp.margin = LogTextMargin();
                 g = tmp;
             }
             else

@@ -8,7 +8,7 @@
   - Your first-person hands show. They were switched off along with the rest of what other players don't see.
   - The weapon in your hands is drawn by the viewmodel camera, like in game: at the viewmodel FOV, and it no longer clips into walls.
 - **Voice chat kept out of replays:** the "who's talking" tags and your own "transmitting voice" note are no longer recorded. Recordings made with 1.0.0, where they showed up as a white box, skip them too.
-- **Kill feed:** replays show the same kill feed whether you just launched the game or just finished a match. Kill feed lines left over from the live game no longer fade along with the replay.
+- **Kill feed:** replays show the same kill feed whether you just launched the game or just finished a match. Kill feed lines left over from the live game no longer fade along with the replay. The text in each line's box keeps the gap below it, like in game.
 
 ## 1.0.0
 

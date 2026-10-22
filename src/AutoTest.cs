@@ -42,6 +42,7 @@ namespace Streplay
     //   cam chase|orbit|victim   the third-person angles
     //   cfg <Section.Key> <v>    set a config value (remember to put it back)
     //   flag                     what the marker key does (flags a kill made in the last few seconds)
+    //   killline                 write a kill feed line through the game (in a session)
     //   nexttake                 bump ScoreManager's take index (in an exploration session)
     //   browser on|off           open / close the replay browser
     //   eventsys                 log whether the game's UI input (EventSystem) is enabled
@@ -207,6 +208,10 @@ namespace Streplay
                     return null;
                 }
                 case "vcdiag": Log(rp.TestVictimDiag()); return null;
+                case "killline":
+                    PauseManager.Instance.WriteLog("<b><color=#" + PauseManager.Instance.selfNameLogColor + ">Target</color></b> was killed with a <b><color=white>FG42</color></b> by <b><color=#"
+                        + PauseManager.Instance.enemyNameLogColor + ">" + (ClientInstance.Instance != null ? ClientInstance.Instance.PlayerNameTag : "me") + "</color></b>");
+                    return null;
                 case "hudprobe": if (a.Length > 1) HudReplay.ProbeOnRender = a[1] == "on"; else rp.TestProbe(); return null;
                 case "highlights": return WaitHighlights(a.Length > 1 ? int.Parse(a[1]) : 10);
                 case "hltab":
