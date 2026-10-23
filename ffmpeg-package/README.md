@@ -1,6 +1,6 @@
 # STREPLAY FFMPEG
 
-An optional add-on for **STREPLAY**. Install it, and STREPLAY renders replays straight to video files (MP4 with H.264/H.265, or MOV with ProRes 4444) instead of PNG frames. You don't need to set anything up: STREPLAY finds it automatically.
+An optional add-on for **[STREPLAY](https://thunderstore.io/c/straftat/p/1nf/STREPLAY/)**. Install it, and STREPLAY renders replays straight to video files (MP4 with H.264/H.265, or MOV with ProRes 4444) instead of PNG frames. You don't need to set anything up: STREPLAY finds it automatically.
 
 It doesn't add anything to the game itself: it's ffmpeg, plus the small part of STREPLAY that starts it.
 

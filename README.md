@@ -23,9 +23,9 @@ STREPLAY only records what your own game already shows you. It is marked as vani
 
 ## Install
 
-Install with a mod manager: **r2modman** or the Thunderstore Mod Manager. BepInEx is installed for you. Start the game with **Start modded**.
+Install with a mod manager, **r2modman** or the Thunderstore Mod Manager: [STREPLAY on Thunderstore](https://thunderstore.io/c/straftat/p/1nf/STREPLAY/). BepInEx is installed for you. Start the game with **Start modded**.
 
-To render straight to **video** files (MP4/MOV), also install **STREPLAY FFMPEG** (`1nf-STREPLAY_FFMPEG`, 9.0.3 or later), which contains ffmpeg and what STREPLAY uses to run it. STREPLAY finds it automatically. If you'd rather use your own ffmpeg, keep the package installed and put `ffmpeg.exe` in an `ffmpeg` folder inside your replay folder, or on your PATH, or set `FfmpegPath` in the config.
+To render straight to **video** files (MP4/MOV), also install **[STREPLAY FFMPEG](https://thunderstore.io/c/straftat/p/1nf/STREPLAY_FFMPEG/)** (`1nf-STREPLAY_FFMPEG`, 9.0.3 or later), which contains ffmpeg and what STREPLAY uses to run it. STREPLAY finds it automatically. If you'd rather use your own ffmpeg, keep the package installed and put `ffmpeg.exe` in an `ffmpeg` folder inside your replay folder, or on your PATH, or set `FfmpegPath` in the config.
 
 Without ffmpeg, renders are saved as PNG frames plus a `.wav` file, which any video editor can import.
 
