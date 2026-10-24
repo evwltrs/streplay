@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.1.3
 
 - **Teammates get the team outline colour** in team games (2v2): replays now remember each player's team. In 1v1 and free-for-all everyone else stays in the enemy colour. Rounds recorded before this don't have teams, so there everyone but you is still in the enemy colour.
 
