@@ -345,7 +345,7 @@ namespace Streplay
                     }
                 }
                 if (go == null) { missing++; continue; }
-                var p = new Puppet { Info = info, Go = go, Owned = owned };
+                var p = new Puppet { Info = info, Go = go, Owned = owned, Teammate = IsTeammate(info) };
                 p.Bind();
                 if (!info.IsPlayer) p.Bodies = go.GetComponentsInChildren<Rigidbody>(true);
                 if (owned && info.IsPlayer)
@@ -394,6 +394,15 @@ namespace Streplay
                 var l = fpc.playerCamera.GetComponent<UnityEngine.Rendering.PostProcessing.PostProcessLayer>();
                 Plugin.Log.LogDebug($"[pp] player cam layer={(l != null ? $"yes mask={l.volumeLayer.value:X8} aa={l.antialiasingMode}" : "none")}");
             }
+        }
+
+        // on the recording player's team, by the teams saved in the .strp.json (none in older files: nobody is)
+        bool IsTeammate(ObjectInfo info)
+        {
+            if (info.Player == null || info.Player.IsLocal || _meta == null) return false;
+            var me = _meta.Players.FirstOrDefault(m => m.IsLocal && m.TeamId.HasValue);
+            var them = _meta.Players.FirstOrDefault(m => m.PlayerId == info.Player.PlayerId);
+            return me != null && them?.TeamId != null && them.TeamId == me.TeamId;
         }
 
         static readonly FieldInfo F_SetupCameras = HarmonyLib.AccessTools.Field(typeof(PlayerSetup), "cameras");

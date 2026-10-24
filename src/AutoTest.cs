@@ -48,6 +48,7 @@ namespace Streplay
     //   keys <seconds> <key>... [shot=<name>]   hold keys through the Input System (W LeftShift C slides), shot halfway
     //   lookat <item> <d> | drop   stand d units from a live item looking at it (then keys 0.3 F picks it up) | drop what's
     //                            in the right hand (in a session)
+    //   teams                    log who the replay outlines as you, teammate or enemy
     //   items                    log every live item (where it sits, held or not, position, rotation)
     //   livecamat x y z | camat x y z   a camera looking at that point from 1.5 units away, live (in a session) or in a replay
     //   livecam <item> <d>       an extra camera d units from the first live item of that name (in a session)
@@ -302,6 +303,7 @@ namespace Streplay
                     return null;
                 }
                 case "camat": rp.TestCamAt(new Vector3(F(a[1]), F(a[2]), F(a[3]))); return null;
+                case "teams": Log("teams: " + rp.TestTeams()); return null;
                 case "keys": return HoldKeys(F(a[1]), a.Skip(2).ToArray());
                 case "hudprobe": if (a.Length > 1) HudReplay.ProbeOnRender = a[1] == "on"; else rp.TestProbe(); return null;
                 case "highlights": return WaitHighlights(a.Length > 1 ? int.Parse(a[1]) : 10);

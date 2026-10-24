@@ -649,10 +649,12 @@ namespace Streplay
             _w.Write(client.PlayerName ?? "");
             _w.Write(tr.Nob.IsOwner);
             _w.Write(mat);
+            int team = TeamOf(client.PlayerId);
             var known = _meta.Players.FirstOrDefault(p => p.PlayerId == client.PlayerId);
-            if (known != null && tr.Nob.IsOwner && !known.IsLocal)
+            if (known != null && ((tr.Nob.IsOwner && !known.IsLocal) || known.TeamId != team))
             {
-                known.IsLocal = true; // first seen before the game handed it to us (see Sample)
+                if (tr.Nob.IsOwner) known.IsLocal = true; // first seen before the game handed it to us (see Sample)
+                known.TeamId = team;
                 try { _meta.Save(); } catch { /* best effort, saved again on stop */ }
             }
             if (known == null)
@@ -663,10 +665,16 @@ namespace Streplay
                     PlayerId = client.PlayerId,
                     SteamId = client.PlayerSteamID,
                     IsLocal = tr.Nob.IsOwner,
+                    TeamId = team,
                 });
                 try { _meta.Save(); } catch { /* best effort, saved again on stop */ }
             }
         }
+
+        // The player's team as the game outlines it: ScoreManager.GetTeamId without its side effect (it assigns a player
+        // without a team to a team of their own, which is what they are in 1v1 and free-for-all).
+        static int TeamOf(int playerId) =>
+            ScoreManager.Instance != null && ScoreManager.Instance.PlayerIdToTeamId.TryGetValue(playerId, out int team) ? team : playerId;
 
         void WriteState(Tracked tr)
         {

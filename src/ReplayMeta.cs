@@ -42,6 +42,7 @@ namespace Streplay
             public int PlayerId;
             public ulong SteamId;
             public bool IsLocal;
+            public int? TeamId;         // the team the game outlined them with (1v1 / free-for-all: their own); null = unknown (older files)
         }
 
         public sealed class MetaMarker

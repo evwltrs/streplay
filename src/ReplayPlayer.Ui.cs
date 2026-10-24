@@ -138,6 +138,9 @@ namespace Streplay
         internal void TestHelp(bool on) => _help = on;
         internal void TestProbe() => _hud.ProbeCentre(_rendering ? "render" : "window");
         internal void TestMoveFree(Vector3 d) => _freePos += Quaternion.Euler(_pitch, _yaw, 0f) * d;
+        internal string TestTeams() => string.Join(", ", _puppets.Where(p => p != null && p.Info.IsPlayer && p.Owned)
+            .Select(p => $"{p.DisplayName}{(p.IsLocalPlayer ? " (you)" : p.Teammate ? " (teammate)" : " (enemy)")}").Distinct());
+
         // free cam 1.5 m from a point, looking at it (matches AutoTest's livecamat)
         internal void TestCamAt(Vector3 c)
         {

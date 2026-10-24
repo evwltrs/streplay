@@ -24,6 +24,7 @@ namespace Streplay
         public GameObject HatRoot;         // where hat and cigarette are worn (hidden in this player's own view)
         public GameObject HatPrefab;       // thrown off by the death ragdoll
         public bool Seen;
+        public bool Teammate;              // on the recording player's team (from the .strp.json; older files don't say)
 
         // local player's first-person arms (v2 recordings)
         public Transform[] Vm = Array.Empty<Transform>();
@@ -243,8 +244,9 @@ namespace Streplay
         static MaterialPropertyBlock _block;
 
         // Player outlines, the way PlayerSetup's dress RPC draws them: a line in the player's outline colour around
-        // the body (thinner around the head), sized by the outline width setting. Recordings don't keep teams, so the
-        // recording player gets the team colour and everyone else the enemy colour (right for 1v1 and free-for-all).
+        // the body (thinner around the head), sized by the outline width setting. The recording player and their
+        // teammates get the team colour, everyone else the enemy colour. Recordings from before teams were saved
+        // only know the recording player's own team.
         // Off sets the width to 0, which is how a player without outlines looks.
         internal static void ApplyOutline(Puppet p, bool on)
         {
@@ -252,7 +254,7 @@ namespace Streplay
             if (setup == null || !(F_DisableForMe?.GetValue(setup) is GameObject[] parts)) return;
             float mult = PlayerPrefs.HasKey("OutlineWidthMultiplier")
                 ? Mathf.Clamp01(PlayerPrefs.GetFloat("OutlineWidthMultiplier")) : OutlineHandler.OutlineWidthMultiplier;
-            var color = p.IsLocalPlayer ? PrefColor("TeamOutlineColor", OutlineHandler.TeamColor) : PrefColor("EnemyOutlineColor", OutlineHandler.EnemyColor);
+            var color = p.IsLocalPlayer || p.Teammate ? PrefColor("TeamOutlineColor", OutlineHandler.TeamColor) : PrefColor("EnemyOutlineColor", OutlineHandler.EnemyColor);
             _block ??= new MaterialPropertyBlock();
             foreach (var go in parts)
             {
