@@ -1,8 +1,8 @@
 # Changelog
 
-## Unreleased
+## 1.1.4
 
-- **Other people's crosshairs:** a replay recorded with a custom crosshair image, or with a crosshair mod you don't have, no longer shows a big coloured square in the middle of the screen. It shows the game's default fixed crosshair instead, in the recorded colour and size setting. If you have the same crosshair mod, its crosshair shows as recorded.
+- **Missing crosshairs fall back to the default.** When a replay's crosshair image isn't in your game (a custom crosshair image, or a crosshair mod you don't have), the replay shows the game's default fixed crosshair, in the recorded colour and size setting, instead of a big coloured square in the middle of the screen. With the same crosshair mod installed, its crosshair shows as recorded.
 
 ## 1.1.3
 
