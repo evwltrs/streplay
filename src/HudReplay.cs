@@ -47,6 +47,7 @@ namespace Streplay
             public Vector2 LogPos;      // and where it appeared
             public List<Transform> Collapsed; // unrecorded parents that are scaled to (almost) zero right now
             public List<UiElementInfo> Groups;  // rebuilt pieces: the recorded CanvasGroups above them (kill feed lines fade out through one)
+            public bool Crosshair;      // the game's crosshair image (it falls back to the default one, see Apply)
         }
 
         // MatchLogs moves every visible line up 35 units when a new one arrives. Before v7 the recorder dropped
@@ -175,7 +176,19 @@ namespace Streplay
                 if (c == null) { missing++; if (missingPaths.Count < 60) missingPaths.Add(el.Path); continue; }
                 _bound.Add(new Bound { Info = el, C = c });
             }
-            foreach (var b in _bound) b.Part = PartOf(b.Info.Path);
+            var crosshair = global::Crosshair.Instance != null ? global::Crosshair.Instance.image : null;
+            _modCrosshair = false;
+            foreach (var b in _bound)
+            {
+                b.Part = PartOf(b.Info.Path);
+                b.Crosshair = crosshair != null && b.C == crosshair;
+                // a crosshair mod's own pieces, recorded and found in this game too: that mod draws the crosshair
+                // (anything crosshair-named that isn't the game's own crosshair or scope, or under them)
+                if (crosshair != null && b.C != null && b.Info.Path.IndexOf("Crosshair", StringComparison.OrdinalIgnoreCase) >= 0
+                    && !b.C.transform.IsChildOf(crosshair.transform)
+                    && !(global::Crosshair.Instance.scopeImage != null && b.C.transform.IsChildOf(global::Crosshair.Instance.scopeImage.transform)))
+                    _modCrosshair = true;
+            }
             LinkGroups(data);
             _logBirths.Clear();
             if (data.Header.Version < 7)
@@ -541,11 +554,21 @@ namespace Streplay
                     if (col.a <= 0.002f) { g.enabled = false; continue; }
                 }
                 g.color = col;
+                bool defaultCrosshair = false;
                 if (g is Image img)
                 {
                     if (s.Sprite >= 0 && _data.UiStrings.TryGetValue(s.Sprite, out var spriteName))
                     {
-                        var sp = FindSprite(spriteName);
+                        // an unnamed sprite is a custom crosshair image someone loaded into the game, and a crosshair mod
+                        // brings its own: neither is in this game, and the image left as it is shows whatever sprite it
+                        // had, stretched to the recorded size. The game's default fixed crosshair stands in for them.
+                        var sp = spriteName.Length > 0 ? FindSprite(spriteName) : null;
+                        if (sp == null && b.Crosshair && _modCrosshair) { g.enabled = false; continue; } // the mod's crosshair shows instead
+                        if (sp == null && b.Crosshair && global::Crosshair.Instance.defaultFixedCrosshair != null)
+                        {
+                            sp = global::Crosshair.Instance.defaultFixedCrosshair;
+                            defaultCrosshair = true;
+                        }
                         if (sp != null && img.sprite != sp) img.sprite = sp;
                     }
                     if (img.type == Image.Type.Filled) img.fillAmount = s.Fill;
@@ -583,7 +606,7 @@ namespace Streplay
                     continue;
                 }
                 rt.anchoredPosition = s.Pos;
-                rt.sizeDelta = s.Size;
+                rt.sizeDelta = defaultCrosshair ? DefaultCrosshairSize : s.Size; // the recorded size was the custom image's
                 rt.localScale = s.Scale;
                 var e = rt.localEulerAngles;
                 rt.localEulerAngles = new Vector3(e.x, e.y, s.RotZ);
@@ -748,6 +771,9 @@ namespace Streplay
             }
             return _fonts.TryGetValue(name, out var font) ? font : null;
         }
+
+        static readonly Vector2 DefaultCrosshairSize = new Vector2(400f, 400f); // what the game gives its default fixed crosshair
+        bool _modCrosshair; // a crosshair mod's pieces were recorded and are in this game too
 
         Sprite FindSprite(string name)
         {
