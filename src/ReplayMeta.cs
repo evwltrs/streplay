@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using Newtonsoft.Json;
 
 namespace Streplay
@@ -71,23 +72,101 @@ namespace Streplay
         {
             lock (SaveLock)
             {
-                string json = JsonConvert.SerializeObject(this, Formatting.Indented);
-                string tmp = MetaPath + "." + Guid.NewGuid().ToString("N").Substring(0, 8) + ".tmp";
-                File.WriteAllText(tmp, json);
-                try
+                long seq = Interlocked.Increment(ref _seq);
+                lock (QueueLock) Pending.Remove(MetaPath); // this copy is newer than anything still queued
+                Write(MetaPath, JsonConvert.SerializeObject(this, Formatting.Indented), seq);
+            }
+        }
+
+        // Saves made mid-round (a kill or death marker, a player joining) don't wait for the disk: the game thread only
+        // turns the metadata into JSON, and a background thread writes it. On a hard drive that's also busy with the
+        // recording, a write and its file swap can take a good part of a second, which showed as a hitch on every kill.
+        public void SaveSoon()
+        {
+            string json = JsonConvert.SerializeObject(this, Formatting.Indented);
+            lock (QueueLock)
+            {
+                Pending[MetaPath] = (Interlocked.Increment(ref _seq), json);
+                if (_writer == null)
                 {
-                    if (!File.Exists(MetaPath)) File.Move(tmp, MetaPath);
-                    else
-                    {
-                        try { File.Replace(tmp, MetaPath, null); }
-                        catch (PlatformNotSupportedException) { File.Delete(MetaPath); File.Move(tmp, MetaPath); }
-                    }
+                    _writer = new Thread(WriteLoop) { IsBackground = true, Name = "Streplay metadata writer" };
+                    _writer.Start();
                 }
-                catch
+            }
+            Wake.Set();
+        }
+
+        // The recording is being deleted: nothing queued for it may write its .json back.
+        public static void Discard(string metaPath)
+        {
+            lock (SaveLock)
+            {
+                lock (QueueLock) Pending.Remove(metaPath);
+                Written[metaPath] = long.MaxValue;
+            }
+        }
+
+        // Writes whatever is still queued, now (the game is closing).
+        public static void FlushPending()
+        {
+            while (TakePending(out var path, out var item))
+                try { lock (SaveLock) Write(path, item.json, item.seq); }
+                catch (Exception e) { Plugin.Log.LogWarning($"Could not save {Path.GetFileName(path)}: {e.Message}"); }
+        }
+
+        static readonly object QueueLock = new object();
+        static readonly Dictionary<string, (long seq, string json)> Pending = new Dictionary<string, (long, string)>(StringComparer.OrdinalIgnoreCase);
+        static readonly Dictionary<string, long> Written = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase); // newest save on disk, under SaveLock
+        static readonly AutoResetEvent Wake = new AutoResetEvent(false);
+        static Thread _writer;
+        static long _seq;
+
+        static bool TakePending(out string path, out (long seq, string json) item)
+        {
+            lock (QueueLock)
+            {
+                foreach (var kv in Pending)
                 {
-                    try { File.Delete(tmp); } catch { /* best effort */ }
-                    throw;
+                    path = kv.Key;
+                    item = kv.Value;
+                    Pending.Remove(path);
+                    return true;
                 }
+            }
+            path = null;
+            item = default;
+            return false;
+        }
+
+        static void WriteLoop()
+        {
+            while (true)
+            {
+                Wake.WaitOne();
+                FlushPending();
+            }
+        }
+
+        // caller holds SaveLock
+        static void Write(string path, string json, long seq)
+        {
+            if (Written.TryGetValue(path, out long newest) && newest > seq) return; // a newer copy is already there
+            string tmp = path + "." + Guid.NewGuid().ToString("N").Substring(0, 8) + ".tmp";
+            File.WriteAllText(tmp, json);
+            try
+            {
+                if (!File.Exists(path)) File.Move(tmp, path);
+                else
+                {
+                    try { File.Replace(tmp, path, null); }
+                    catch (PlatformNotSupportedException) { File.Delete(path); File.Move(tmp, path); }
+                }
+                Written[path] = seq;
+            }
+            catch
+            {
+                try { File.Delete(tmp); } catch { /* best effort */ }
+                throw;
             }
         }
 

@@ -197,7 +197,7 @@ namespace Streplay
                 k.Meta.Markers.Add(k.Marker);
                 k.Meta.Markers.Sort((x, y) => x.T.CompareTo(y.T));
             }
-            try { k.Meta.Save(); } catch (Exception e) { Plugin.Log.LogWarning($"Marker metadata save failed: {e.Message}"); }
+            k.Meta.SaveSoon();
             Plugin.Log.LogInfo($"Flagged the kill at {k.Marker.T:0.00}s in {k.Meta.ReplayFile}");
             ShowToast("Kill marked", k.Meta == _meta ? "your last kill" : "your last kill, previous round");
             return true;
@@ -293,7 +293,11 @@ namespace Streplay
             }
         }
 
-        void OnApplicationQuit() => Stop();
+        void OnApplicationQuit()
+        {
+            Stop();
+            ReplayMeta.FlushPending(); // markers still on their way to disk
+        }
 
         // FishNet briefly activates its own holder scene during scene changes.
         static readonly string[] AlwaysSkip = { "MainMenu", "MovedObjectsHolder", "EmptyScene", "VictoryScene" };
@@ -399,6 +403,7 @@ namespace Streplay
             if (duration < 3f && _meta.Markers.Count == 0 && _lastKill?.Meta != _meta)
             {
                 // scene-transition blips; not worth keeping
+                ReplayMeta.Discard(_meta.MetaPath);
                 try { File.Delete(_meta.ReplayPath); File.Delete(_meta.MetaPath); } catch { /* ignore */ }
                 _tracked.Clear();
                 return;
@@ -433,7 +438,7 @@ namespace Streplay
             _w.Write(auto);
             var marker = new ReplayMeta.MetaMarker { T = t, Label = label, Auto = auto };
             _meta.Markers.Add(marker);
-            try { _meta.Save(); } catch (Exception e) { Plugin.Log.LogWarning($"Marker metadata save failed: {e.Message}"); }
+            _meta.SaveSoon(); // mid-round: the game doesn't wait for the disk (see ReplayMeta.SaveSoon)
             if (!auto) ShowToast("Marked", "this moment"); // automatic ones (kills, deaths) stay quiet
             return marker;
         }
@@ -655,7 +660,7 @@ namespace Streplay
             {
                 if (tr.Nob.IsOwner) known.IsLocal = true; // first seen before the game handed it to us (see Sample)
                 known.TeamId = team;
-                try { _meta.Save(); } catch { /* best effort, saved again on stop */ }
+                _meta.SaveSoon(); // saved again on stop
             }
             if (known == null)
             {
@@ -667,7 +672,7 @@ namespace Streplay
                     IsLocal = tr.Nob.IsOwner,
                     TeamId = team,
                 });
-                try { _meta.Save(); } catch { /* best effort, saved again on stop */ }
+                _meta.SaveSoon(); // saved again on stop
             }
         }
 
@@ -976,7 +981,7 @@ namespace Streplay
                 if (victim != null)
                 {
                     _lastKill.Marker.Label = $"Kill: {victim}";
-                    try { _meta.Save(); } catch (Exception e) { Plugin.Log.LogWarning($"Marker metadata save failed: {e.Message}"); }
+                    _meta.SaveSoon();
                 }
             }
             // every death, exploded or not, plays out through this RPC on the dead player's client too
