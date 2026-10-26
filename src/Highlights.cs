@@ -19,6 +19,8 @@ namespace Streplay
         public const int Version = 6;
         // bump when what's measured from a recording changes (then every recording is read again)
         public const int FeaturesVersion = 1;
+        // bump when how a mod's arena is spotted in older recordings changes (only their first seconds are read)
+        public const int ArenaCheckVersion = 1;
 
         static readonly Regex Tag = new Regex("<[^>]*>");
         internal static readonly Regex Who = new Regex(@"\{PLAYER_NAME\}:\{(\d+)\}");
@@ -77,6 +79,8 @@ namespace Streplay
         // the highlights of a measured recording: kills chained into multi-kills, scored and tagged
         public static List<ReplayMeta.MetaHighlight> Score(ReplayMeta meta)
         {
+            // a round in a STRAFTH arena isn't a match: none of it goes into Highlights
+            if (!string.IsNullOrEmpty(meta.ModArena)) return new List<ReplayMeta.MetaHighlight>();
             var kills = meta.KillRecs ?? new List<KillRec>();
             var takeWins = meta.TakeWins ?? new List<float>();
             var result = new List<ReplayMeta.MetaHighlight>();
@@ -441,6 +445,13 @@ namespace Streplay
             return v.Count == 0 ? 0f : v[v.Count / 2];
         }
 
+        // a recording from before arenas were recorded: told apart by where its camera spends its first frames
+        static bool InModArena(ReplayData data)
+        {
+            var ys = data.Frames.Where(f => f.CamPos != Vector3.zero).Select(f => f.CamPos.y).OrderBy(y => y).ToList();
+            return ys.Count > 0 && ys[ys.Count / 2] > 1000f;
+        }
+
         // ---------------------------------------------------------------- background scan
 
         static Thread _thread;
@@ -455,7 +466,7 @@ namespace Streplay
             if (Scanning) return;
             // unfinished rounds too (the game closed or crashed mid-round), except the one being recorded right now
             string recording = Recorder.Instance != null ? Recorder.Instance.CurrentMetaPath : null;
-            var todo = metas.Where(m => m.HighlightsVersion < Version
+            var todo = metas.Where(m => (m.HighlightsVersion < Version || m.ArenaCheck < ArenaCheckVersion)
                                         && (m.Finished || !string.Equals(m.MetaPath, recording, StringComparison.OrdinalIgnoreCase))).ToList();
             if (todo.Count == 0) return;
             // every recording's weapon zoom first, so no-scopes are judged the same whatever the order
@@ -476,9 +487,10 @@ namespace Streplay
                         if (work == null) { m.HighlightsVersion = Version; _done++; continue; }
                         // measured before (current measurements): only the scoring changed, no need to read the recording
                         bool measured = work.FeaturesVersion == FeaturesVersion && work.KillRecs != null;
+                        ReplayData data = null;
                         if (!measured || !work.Finished)
                         {
-                            var data = ReplayIO.Read(work.ReplayPath);
+                            data = ReplayIO.Read(work.ReplayPath);
                             if (!measured) { Measure(data, work); reread++; }
                             if (!work.Finished)
                             {
@@ -486,6 +498,12 @@ namespace Streplay
                                 work.Duration = data.Duration;
                                 work.Finished = true;
                             }
+                        }
+                        if (work.ArenaCheck < ArenaCheckVersion)
+                        {
+                            // recorded before arenas were: the first 15 s of the camera tell
+                            if (work.ModArena == null && InModArena(data ?? ReplayIO.Read(work.ReplayPath, 15 * 60))) work.ModArena = ModArenaCapture.StrafthName;
+                            work.ArenaCheck = ArenaCheckVersion;
                         }
                         var found = Score(work);
                         ReplayMeta.UpdateFile(m.MetaPath, f =>
@@ -496,11 +514,15 @@ namespace Streplay
                             f.TakeWins = work.TakeWins;
                             f.WeaponZoom = work.WeaponZoom;
                             f.FeaturesVersion = work.FeaturesVersion;
+                            f.ModArena = work.ModArena;
+                            f.ArenaCheck = work.ArenaCheck;
                             if (!f.Finished) { f.Duration = work.Duration; f.Finished = true; }
                         });
                         // reference swaps only: readers on the main thread see the old list or the new one
                         m.Highlights = found;
                         m.HighlightsVersion = Version;
+                        m.ModArena = work.ModArena;
+                        m.ArenaCheck = work.ArenaCheck;
                         if (!m.Finished) { m.Duration = work.Duration; m.Finished = true; }
                     }
                     catch (ThreadAbortException) { throw; } // the game closing: this one gets scanned next time

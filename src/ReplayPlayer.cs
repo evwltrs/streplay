@@ -38,6 +38,7 @@ namespace Streplay
         readonly List<Behaviour> _hiddenUi = new List<Behaviour>();
         readonly List<GameObject> _eventSpawned = new List<GameObject>();
         readonly HudReplay _hud = new HudReplay();
+        readonly ModArenaReplay _arenas = new ModArenaReplay();
         readonly ReplayAudio _audio = new ReplayAudio();
         bool _hudEnabled = true;
         int _curFrameIndex;
@@ -154,6 +155,7 @@ namespace Streplay
             {
                 SetupCamera();
                 BuildPuppets();
+                _arenas.Build(_data);
                 _hudBoundTo = null; // bound to the live local player object in LateUpdate
                 _audio.Bind(_data, _puppets, _cam != null ? _cam.transform : null);
                 _audio.IsEffectObject = go => _eventSpawned.Contains(go) || _restored.Values.Any(l => l.Contains(go));
@@ -226,6 +228,7 @@ namespace Streplay
             ClearRestored();
             _restoreRules = null;
             _hud.Dispose();
+            _arenas.Dispose();
             Plugin.Log.LogInfo($"Replay closed, {_audio.Stats}");
             _audio.Dispose();
             _postFx.Dispose();
@@ -676,6 +679,7 @@ namespace Streplay
             var b = i + 1 < _data.Frames.Count ? _data.Frames[i + 1] : a;
             float alpha = b.T > a.T ? Mathf.Clamp01((t - a.T) / (b.T - a.T)) : 0f;
             _curFrame = a;
+            _arenas.Apply(i, alpha);
             _origPos = Vector3.Lerp(a.CamPos, b.CamPos, alpha);
             _origRot = Quaternion.Slerp(a.CamRot, b.CamRot, alpha);
             _origFov = Mathf.Lerp(a.CamFov, b.CamFov, alpha);

@@ -2,7 +2,8 @@
 
 ## Unreleased
 
-- **No more hitch on kills with the replay folder on a hard drive.** Kill and death markers (and players joining mid-round) used to be saved to the round's file right away, and the game waited for that. On a hard drive that's also writing the recording, and with a big replay folder, that could freeze the game for about a second on every kill. The saves now happen in the background; the round is still saved in full when it ends.
+- **STRAFTH support.**
+- **No more hitch on kills** when the replay folder is on a hard drive.
 
 ## 1.1.4
 

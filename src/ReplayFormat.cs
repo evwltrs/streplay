@@ -27,6 +27,8 @@ namespace Streplay
         public const byte AudioFrame = 12; // v6: AudioSource changes for the preceding frame
         public const byte Cosmetics = 13;  // v6: player suit / cigarette / hat
         public const byte View = 14;       // v6: local camera post-process + viewmodel FOV, for the preceding frame
+        // 15-22: a STRAFTH arena, see ModArenaRec. Only written while one is there, so other recordings are unchanged
+        // and the version stays the same.
         public const byte End = 255;
     }
 
@@ -263,6 +265,7 @@ namespace Streplay
         public readonly Dictionary<int, AudioSrcInfo> AudioSources = new Dictionary<int, AudioSrcInfo>();
         public readonly List<int> ViewFrames = new List<int>();
         public readonly List<ViewState> ViewStates = new List<ViewState>();
+        public readonly ModArenaData Mod = new ModArenaData();
         public float Duration;
         public bool Truncated;
     }
@@ -322,7 +325,8 @@ namespace Streplay
         public static Vector3 ReadVec3(this BinaryReader r) => new Vector3(r.ReadSingle(), r.ReadSingle(), r.ReadSingle());
         public static Quaternion ReadQuat(this BinaryReader r) => new Quaternion(r.ReadSingle(), r.ReadSingle(), r.ReadSingle(), r.ReadSingle());
 
-        public static ReplayData Read(string path)
+        // maxFrames: stop after that many frames (a quick look at the start of a round), marked Truncated
+        public static ReplayData Read(string path, int maxFrames = int.MaxValue)
         {
             var data = new ReplayData();
             using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 1 << 16);
@@ -428,6 +432,17 @@ namespace Streplay
                         }
                         case Rec.Frame:
                             data.Frames.Add(ReadFrame(r, live, version, boneRoots));
+                            if (data.Frames.Count >= maxFrames) { data.Truncated = true; return data; }
+                            break;
+                        case ModArenaRec.Texture:
+                        case ModArenaRec.Material:
+                        case ModArenaRec.Mesh:
+                        case ModArenaRec.Part:
+                        case ModArenaRec.Pose:
+                        case ModArenaRec.Vis:
+                        case ModArenaRec.Mats:
+                        case ModArenaRec.Sky:
+                            data.Mod.Read((byte)tag, r, Math.Max(0, data.Frames.Count - 1));
                             break;
                         case Rec.Event:
                         {

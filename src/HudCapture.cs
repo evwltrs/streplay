@@ -160,6 +160,9 @@ namespace Streplay
             }
         }
 
+        // STRAFTH's own overlays: not the game's HUD
+        internal static bool IsModOverlay(string rootName) => rootName == "ST_Hud" || rootName == "ST_Cover";
+
         void ScanRoots(Transform localRoot)
         {
             _roots.Clear();
@@ -175,9 +178,12 @@ namespace Streplay
             var ddol = Net.DdolScene();
             if (ddol.IsValid())
                 foreach (var go in ddol.GetRootGameObjects())
+                {
+                    if (IsModOverlay(go.name)) continue;
                     foreach (var c in go.GetComponentsInChildren<Canvas>(true))
                         if (c.isRootCanvas && c.renderMode != RenderMode.WorldSpace)
                             _roots.Add(new Root { T = c.transform, Anchor = AnchorDdol });
+                }
 
             if (localRoot != null)
                 foreach (var c in localRoot.GetComponentsInChildren<Canvas>(true))

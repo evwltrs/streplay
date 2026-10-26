@@ -33,6 +33,10 @@ namespace Streplay
         public List<Highlights.KillRec> KillRecs;
         public List<float> TakeWins;
         public Dictionary<string, float> WeaponZoom;
+        // played in a STRAFTH arena instead of the map ("STRAFTH"), null = the map. Such rounds stay out of
+        // Highlights. ArenaCheck: Highlights.ArenaCheckVersion once known (recorded, or looked for in an older file).
+        public string ModArena;
+        public int ArenaCheck;
 
         [JsonIgnore] public string MetaPath = "";
         [JsonIgnore] public string ReplayPath => Path.Combine(Path.GetDirectoryName(MetaPath) ?? "", ReplayFile);

@@ -397,6 +397,14 @@ namespace Streplay
                 var tr = new Rect(tx, top + 9f, Mathf.Max(66f, Ui.Measure(take, 11, true) + 22f), 20f);
                 Ui.Slant(tr, Ui.AccentSoft);
                 Ui.Text(tr, take, 11, Ui.Accent, true, TextAnchor.MiddleCenter);
+                tx = tr.xMax + 8f;
+            }
+            // played in a STRAFTH arena, not the map: say so, as it's also why it has no highlights
+            if (!string.IsNullOrEmpty(m.ModArena))
+            {
+                var ar = new Rect(tx, top + 9f, Ui.Measure(m.ModArena, 11, true) + 22f, 20f);
+                Ui.Slant(ar, Ui.Wash(0.12f));
+                Ui.Text(ar, m.ModArena, 11, Ui.Bright, true, TextAnchor.MiddleCenter);
             }
             Ui.Text(new Rect(r.x + 420f, top, 90f, 38f), ReplayPlayer.Fmt(m.Duration) + (m.Finished ? "" : " (incomplete)"), 12, Ui.Dim);
             int kills = m.Highlights?.Sum(h => h.Kills) ?? 0;

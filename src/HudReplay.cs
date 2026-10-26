@@ -159,6 +159,8 @@ namespace Streplay
                 if (el.Path.IndexOf("/VoiceChatIndicator/", StringComparison.Ordinal) >= 0) continue;
                 // and your own "transmitting voice" note, bottom right
                 if (el.Path.IndexOf("--PopupWriting--/VoiceText", StringComparison.Ordinal) >= 0) continue;
+                // STRAFTH's overlays (recordings made before the recorder left them out)
+                if (HudCapture.IsModOverlay(el.Path.Split('/')[0])) continue;
                 // fades of spawned pieces (a kill feed line's CanvasGroup): the rebuilt pieces take them from the recording
                 // (LinkGroups). Bound by path they'd drive whatever copy the live game has left over, or, right after
                 // launching the game when it has none, just count as not found.

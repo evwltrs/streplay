@@ -94,6 +94,11 @@ namespace Streplay
         readonly List<Tracked> _visual = new List<Tracked>();
         readonly HudCapture _hud = new HudCapture();
         bool _hudFailed;
+        readonly ModArenaCapture _arenas = new ModArenaCapture();
+        bool _arenaFailed;
+        // STRAFTH duels: the scoreboard's kills/deaths at the last look (-1 = not in a duel), and the kills/deaths the
+        // game's own hooks marked since then, so the scoreboard only adds the markers they didn't
+        int _duelKills = -1, _duelDeaths, _hookedKills, _hookedDeaths;
 
         void Awake()
         {
@@ -170,7 +175,32 @@ namespace Streplay
 
         internal void OnLocalDeath()
         {
-            if (IsRecording && Plugin.AutoMarkDeaths.Value) AddMarker("Died", auto: true);
+            if (!IsRecording) return;
+            _hookedDeaths++;
+            if (Plugin.AutoMarkDeaths.Value) AddMarker("Died", auto: true);
+        }
+
+        // kills and deaths on STRAFTH's scoreboard that the game's own hooks didn't report
+        void DuelScoreMarkers()
+        {
+            if (!ModArenaCapture.TryDuelScore(out int kills, out int deaths)) { _duelKills = -1; return; }
+            if (_duelKills < 0 || kills < _duelKills || deaths < _duelDeaths)
+            {
+                // the start of a duel (or a new one): the score so far isn't this round's
+                _duelKills = kills; _duelDeaths = deaths;
+                _hookedKills = _hookedDeaths = 0;
+                return;
+            }
+            for (int i = _hookedKills; i < kills - _duelKills; i++)
+            {
+                float t = CurrentTime;
+                var marker = Plugin.AutoMarkKills.Value ? AddMarker("Kill", auto: true) : null;
+                _lastKill = new KillMark { Meta = _meta, Marker = marker ?? new ReplayMeta.MetaMarker { T = t, Label = "Kill", Auto = true }, At = Time.unscaledTime };
+            }
+            for (int i = _hookedDeaths; i < deaths - _duelDeaths; i++)
+                if (Plugin.AutoMarkDeaths.Value) AddMarker("Died", auto: true);
+            _duelKills = kills; _duelDeaths = deaths;
+            _hookedKills = _hookedDeaths = 0;
         }
 
         // Called (observe-only) when the game counts a kill for the local player, which every weapon does.
@@ -178,6 +208,7 @@ namespace Streplay
         {
             if (!IsRecording || Time.frameCount == _killFrame) return; // a weapon's kill path and the kill counter, same kill
             _killFrame = Time.frameCount;
+            _hookedKills++;
             float t = CurrentTime;
             var marker = Plugin.AutoMarkKills.Value ? AddMarker("Kill", auto: true) : null;
             _lastKill = new KillMark { Meta = _meta, Marker = marker ?? new ReplayMeta.MetaMarker { T = t, Label = "Kill", Auto = true }, At = Time.unscaledTime };
@@ -350,6 +381,7 @@ namespace Streplay
                     GameVersion = header.GameVersion,
                     Take = CurrentTake >= 0 ? CurrentTake + 1 : 0,
                     SampleRate = header.SampleRate,
+                    ArenaCheck = Highlights.ArenaCheckVersion, // known as it's recorded (ModArena set if one turns up)
                 };
                 _meta.Part = _prevLoads == _sceneLoads && _prevScene == scene && _prevSession == _sessionId && _prevTake == _meta.Take && _meta.Take > 0
                     ? Math.Max(1, _prevPart) + 1 : 1;
@@ -364,6 +396,9 @@ namespace Streplay
                 _hasView = false;
                 _hud.Reset();
                 _hudFailed = false;
+                _arenas.Reset();
+                _arenaFailed = false;
+                _duelKills = -1;
                 Plugin.Log.LogInfo($"Recording {baseName}");
             }
             catch (Exception e)
@@ -554,6 +589,27 @@ namespace Streplay
                     // a HUD glitch must never cost the rest of the recording
                     _hudFailed = true;
                     Plugin.Log.LogError($"HUD capture disabled for this round: {e}");
+                }
+            }
+
+            // a STRAFTH arena (only looked for when STRAFTH is loaded)
+            if (!_arenaFailed && ModArenaCapture.Available)
+            {
+                try
+                {
+                    bool had = _arenas.Any;
+                    _arenas.Sample(_w);
+                    if (!had && _arenas.Any)
+                    {
+                        _meta.ModArena = ModArenaCapture.StrafthName;
+                        _meta.SaveSoon();
+                    }
+                    DuelScoreMarkers();
+                }
+                catch (Exception e)
+                {
+                    _arenaFailed = true;
+                    Plugin.Log.LogError($"STRAFTH arena capture disabled for this round: {e}");
                 }
             }
 

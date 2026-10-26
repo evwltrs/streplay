@@ -35,6 +35,7 @@ namespace Streplay
     //   renderpanel on|off       show the render settings panel
     //   ffmpegpath <path>|none   set Render.FfmpegPath
     //   openfolder <path>        what the Folder buttons do, for that folder (created if missing)
+    //   click [seconds]          hold the left mouse button (fire), logging the recording time it went down
     //   highlights [n]           wait for the highlight scan, log the top n across all matches
     //   hltab [all]              show the browser's Highlights tab (latest match, or all)
     //   hlwatch <n>              open the n-th best highlight (all matches) like the browser's Watch button
@@ -117,6 +118,20 @@ namespace Streplay
                 yield return null;
             }
             UnityEngine.InputSystem.InputSystem.QueueStateEvent(kb, new UnityEngine.InputSystem.LowLevel.KeyboardState());
+        }
+
+        IEnumerator Click(float seconds)
+        {
+            var mouse = UnityEngine.InputSystem.Mouse.current;
+            if (mouse == null) { Log("no mouse"); yield break; }
+            Log($"click at rec {(Recorder.Instance != null ? Recorder.Instance.CurrentTime : -1f):0.000}");
+            float end = Time.realtimeSinceStartup + seconds;
+            while (Time.realtimeSinceStartup < end)
+            {
+                UnityEngine.InputSystem.InputSystem.QueueStateEvent(mouse, new UnityEngine.InputSystem.LowLevel.MouseState { buttons = 1 });
+                yield return null;
+            }
+            UnityEngine.InputSystem.InputSystem.QueueStateEvent(mouse, new UnityEngine.InputSystem.LowLevel.MouseState());
         }
 
         static void Log(string s) => Plugin.Log.LogInfo("[autotest] " + s);
@@ -324,6 +339,7 @@ namespace Streplay
                 case "renderasync": { var r = Render(rp, a); StartCoroutine(r); return null; }
                 case "rendercancel": rp.TestCancelRender(); return null;
                 case "renderpanel": rp.TestRenderPanel(a[1] == "on"); return null;
+                case "click": return Click(a.Length > 1 ? F(a[1]) : 0.05f);
                 case "openfolder": Ui.OpenFolder(string.Join(" ", a.Skip(1))); return null;
                 case "ffmpegpath": Plugin.FfmpegPath.Value = a.Length > 1 && a[1] != "none" ? string.Join(" ", a.Skip(1)) : ""; Log($"ffmpeg: {Ffmpeg.Find() ?? "not found"}"); return null;
                 case "localsound": LocalSound(a[1], a.Length > 2 ? a[2] : ""); return null;
