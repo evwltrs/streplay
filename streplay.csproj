@@ -9,7 +9,7 @@
     <Nullable>disable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <!-- Keep in sync with Plugin.Version and thunderstore/manifest.json (the Pack target checks) -->
-    <Version>1.1.4</Version>
+    <Version>1.1.5</Version>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>

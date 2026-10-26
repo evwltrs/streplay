@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.1.5
 
 - **STRAFTH support.**
 - **No more hitch on kills** when the replay folder is on a hard drive.

@@ -18,7 +18,7 @@ namespace Streplay
     {
         public const string Guid = "1nf.streplay";
         public const string Name = "STREPLAY";
-        public const string Version = "1.1.4";  // keep in sync with Streplay.csproj and thunderstore/manifest.json
+        public const string Version = "1.1.5";  // keep in sync with Streplay.csproj and thunderstore/manifest.json
 
         internal static ManualLogSource Log;
         internal static Plugin Instance;

@@ -1,6 +1,6 @@
 {
   "name": "STREPLAY",
-  "version_number": "1.1.4",
+  "version_number": "1.1.5",
   "website_url": "https://github.com/evwltrs/streplay",
   "description": "Replays for STRAFTAT. Every round is recorded automatically; watch it back in the real map from your own view (HUD, arms, sounds), free cam or any player, and render clips up to 4K with motion blur.",
   "dependencies": [
